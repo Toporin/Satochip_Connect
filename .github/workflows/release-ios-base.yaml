@@ -1,0 +1,282 @@
+name: release-ios-base
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: "Name of the project"
+        required: true
+        type: string
+      root-path:
+        description: "Path of the react-native project"
+        required: true
+        type: string
+      release-type:
+        description: "Release type of the project (debug/internal/production)"
+        type: string
+      project-type:
+        description: "Type of project (wallet/dapp)"
+        required: true
+        type: string
+      scheme-name:
+        description: "Scheme name of the project"
+        required: true
+        type: string
+      bundle-id:
+        description: "Bundle ID of the project"
+        required: true
+        type: string
+      apple-id:
+        description: "App ID of the project"
+        required: true
+        type: string
+      build-for-simulator:
+        description: "Build for simulator instead of TestFlight"
+        required: false
+        default: false
+        type: boolean
+      env-file-path:
+        description: "Path + name of the env file"
+        required: false
+        type: string
+      upload-to-bucket:
+        description: "Upload to S3"
+        required: false
+        default: false
+        type: boolean
+      package-manager:
+        description: "Package manager of the project"
+        required: false
+        default: 'yarn'
+        type: string
+      testflight-groups:
+        description: "TestFlight groups"
+        required: false
+        type: string
+      is-expo-project:
+        description: "Is Expo project"
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      project-id:
+        description: "WalletConnect Cloud ID"
+        required: true
+      relay-url:
+        description: "WalletConnect Relay URL"
+        required: false
+      sentry-dsn:
+        required: false
+      sentry-file:
+        required: true
+      apple-username:
+        required: true
+      apple-key-id:
+        required: true
+      apple-key-content:
+        required: true
+      apple-issuer-id:
+        required: true
+      match-username:
+        required: true
+      match-keychain-password:
+        required: true
+      match-git-url:
+        required: true
+      match-ssh-key:
+        required: true
+      google-services-file:
+        required: false
+      aws-account-id:
+        required: false
+      slack-webhook-url:
+        required: true
+      testflight-url:
+        description: "TestFlight URL of the project"
+        required: false
+      env-file:
+        required: false
+
+jobs:
+  build:
+    runs-on: macos-latest-xlarge
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: webfactory/ssh-agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.match-ssh-key }}
+
+      - name: Setup
+        uses: ./.github/actions/ci-setup
+        with:
+          root-path: ${{ inputs.root-path }}
+          package-manager: ${{ inputs.package-manager }}
+
+      - name: Expo Prebuild
+        if: ${{ inputs.is-expo-project == true }}
+        run: |
+          cd ${{ inputs.root-path }}
+          npx expo prebuild --platform ios
+
+      - name: Set Xcode paths
+        run: |
+          # Find the .xcodeproj and .xcworkspace (works for both Expo and non-Expo)
+          XCODEPROJ=$(find "${{ inputs.root-path }}/ios" -maxdepth 1 -name "*.xcodeproj" -print -quit)
+          XCWORKSPACE=$(find "${{ inputs.root-path }}/ios" -maxdepth 1 -name "*.xcworkspace" -print -quit)
+          
+          echo "Found Xcode project: $XCODEPROJ"
+          echo "Found Xcode workspace: $XCWORKSPACE"
+          
+          echo "XCODE_PROJECT_PATH=$XCODEPROJ" >> "$GITHUB_ENV"
+          echo "XCWORKSPACE_PATH=$XCWORKSPACE" >> "$GITHUB_ENV"
+
+      - name: Set podfile path
+        if: ${{ inputs.is-expo-project == false }}
+        id: podfile-hash
+        run: |
+          echo "Root path: ${{ inputs.root-path }}"
+          echo "Podfile path: ${{ inputs.root-path }}/ios/Podfile.lock"
+          echo "File exists: $(test -f "${{ inputs.root-path }}/ios/Podfile.lock" && echo "yes" || echo "no")"
+          echo "podfile_path=${{ inputs.root-path }}/ios/Podfile.lock" >> "$GITHUB_ENV"
+
+      - name: Cache pods
+        id: pods-cache
+        if: ${{ inputs.is-expo-project == false }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ inputs.root-path }}/ios/Pods
+          key: ${{ runner.os }}-pods-${{ github.ref_name }}-${{ hashFiles(env.podfile_path) }}
+          restore-keys: |
+            ${{ runner.os }}-pods-${{ github.ref_name }}-
+
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.0
+          bundler-cache: false
+
+      - name: Install Gems
+        run: bundle install
+
+      # Create env file
+      - name: Create env file
+        run: |
+          ENV_FILE_CONTENT="${{ secrets.env-file }}"
+          ENV_FILE_PATH="${{ inputs.env-file-path }}"
+          if [ -n "$ENV_FILE_CONTENT" ] && [ -n "$ENV_FILE_PATH" ]; then
+            echo "$ENV_FILE_CONTENT" > "$ENV_FILE_PATH"
+          else
+            touch ${{ inputs.root-path }}/.env.${{ inputs.release-type }}
+            echo -e "ENV_PROJECT_ID=${{ secrets.project-id }}\nENV_RELAY_URL=${{ secrets.relay-url }}\nENV_SENTRY_DSN=${{ secrets.sentry-dsn }}\nENV_SENTRY_TAG=${{ inputs.release-type }}" >> ${{ inputs.root-path }}/.env.${{ inputs.release-type }}
+          fi
+
+      # Create sentry file
+      - run: touch ${{ inputs.root-path }}/ios/sentry.properties && echo "${{ secrets.sentry-file }}" >> ${{ inputs.root-path }}/ios/sentry.properties
+
+      # Add Google Services file -> to create it run: base64 -i path/to/GoogleService-Info.plist
+      - name: Create Google Services file
+        env:
+          google-services-file: ${{ secrets.google-services-file }}
+        if: ${{ env.google-services-file != '' }}
+        run: echo ${{ env.google-services-file }} | base64 --decode >> ${{ inputs.root-path }}/ios/GoogleService-Info.plist
+
+      - name: ${{ inputs.build-for-simulator && 'Build for simulator' || 'Build and Upload to TestFlight' }}
+        id: build
+        uses: maierj/fastlane-action@v3.0.0
+        with:
+          lane: ${{ inputs.build-for-simulator && 'build_for_simulator' || 'release_testflight' }}
+        env:
+          APPLE_ID: ${{ inputs.apple-id }}
+          APPLE_USERNAME: ${{ secrets.apple-username }}
+          APPLE_KEY_ID: ${{ secrets.apple-key-id }}
+          APPLE_KEY_CONTENT: ${{ secrets.apple-key-content }}
+          APPLE_ISSUER_ID: ${{ secrets.apple-issuer-id }}
+          BUNDLE_ID: ${{ inputs.bundle-id }}
+          MATCH_USERNAME: ${{ secrets.match-username }}
+          MATCH_PASSWORD: ${{ secrets.match-keychain-password }}
+          MATCH_GIT_URL: ${{ secrets.match-git-url }}
+          PODFILE_PATH: ${{ inputs.root-path }}/ios/Podfile
+          SCHEME: ${{ inputs.scheme-name }}
+          XCODE_PROJECT_PATH: ${{ env.XCODE_PROJECT_PATH }}
+          XCWORKSPACE_PATH: ${{ env.XCWORKSPACE_PATH }}
+          PROJECT_TYPE: ${{ inputs.project-type }}
+          RELEASE_TYPE: ${{ inputs.release-type }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          BUILD_FOR_SIMULATOR: ${{ inputs.build-for-simulator }}
+          TESTFLIGHT_GROUPS: ${{ inputs.testflight-groups }}
+
+      - name: Configure AWS credentials
+        id: aws-creds
+        if: ${{ inputs.upload-to-bucket == true }}
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@00943011d9042930efac3dcd3a170e4273319bc8
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.aws-account-id }}:role/prod-github-actions-react-native-builds
+          aws-region: eu-central-1
+          output-env-credentials: false
+          output-credentials: true
+
+      - name: Upload iOS build to S3
+        if: ${{ inputs.upload-to-bucket == true }}
+        id: s3-upload
+        env:
+          AWS_REGION: eu-central-1
+          AWS_ACCESS_KEY_ID: ${{ steps.aws-creds.outputs.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.aws-creds.outputs.aws-secret-access-key }}
+          AWS_SESSION_TOKEN: ${{ steps.aws-creds.outputs.aws-session-token }}
+        continue-on-error: true
+        run: |
+          aws s3 cp \
+            ./build/${{ inputs.project-type }}-${{ inputs.release-type }}.ipa \
+            s3://walletconnect.react-native-builds.prod/ios/${{ inputs.release-type }}/${{ inputs.project-type }}-${{ inputs.release-type }}.ipa
+
+      - name: Send Slack notification
+        if: always() && !cancelled()
+        uses: slackapi/slack-github-action@v2.1.0
+        with:
+          webhook: ${{ secrets.slack-webhook-url }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "iOS Build Report - ${{ inputs.name }} - ${{ inputs.release-type }}",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": { "type": "plain_text", "text": "🍎 iOS Build Report" }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Project:*\n`${{ inputs.name }}`" },
+                    { "type": "mrkdwn", "text": "*Release Type:*\n`${{ inputs.release-type }}`" },
+                    { "type": "mrkdwn", "text": "*Branch:*\n`${{ github.ref_name }}`" },
+                    { "type": "mrkdwn", "text": "*Build for Simulator:*\n`${{ inputs.build-for-simulator }}`" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*Build & TestFlight:*\n`${{ steps.build.outcome == 'success' && '✅ Success' || '❌ Failed' }}`" },
+                    { "type": "mrkdwn", "text": "*S3 Upload:*\n`${{ steps.s3-upload.outcome == 'success' && '✅ Success' || steps.s3-upload.outcome == 'failure' && '❌ Failed' || '⏭️ Skipped' }}`" },
+                    { "type": "mrkdwn", "text": "*Overall Status:*\n`${{ job.status == 'success' && '✅ Success' || '❌ Failed' }}`" }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": { "type": "plain_text", "text": "View Workflow Run" },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }${{ steps.build.outcome == 'success' && inputs.upload-to-bucket == false && secrets.testflight-url != '' && format(',{{"type":"button","text":{{"type":"plain_text","text":"View in TestFlight"}},"url":"{0}"}}', secrets.testflight-url) || '' }}
+                  ]
+                }
+              ]
+            }
