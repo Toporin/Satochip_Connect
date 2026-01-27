@@ -80,7 +80,9 @@ This is one way to run your app — you can also run it directly from within And
 
 ### Step 5: Build APK
 
+Debug APK: 
 ```bash
+yarn build-android-debug
 cd android
 ./gradlew clean
 ./gradlew assembleDebug
