@@ -37,7 +37,7 @@ export default function SessionProposalModal() {
   // get addresses from store
   const allAddresses = SettingsStore.getAddressesForBlockchain("eip155");
   const [selectedAddresses, setSelectedAddresses] = useState<Set<string>>(
-    () => new Set(allAddresses) // Initialize with all addresses selected
+    () => new Set() // Initialize with no addresses - user must opt-in
   );
 
   // Derive addresses array from Set for compatibility
