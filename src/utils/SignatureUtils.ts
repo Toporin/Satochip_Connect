@@ -99,15 +99,16 @@ export function enforceLowS(sBytes: Buffer): Buffer {
 
 /**
  * Recover v value from signature components
- * Tries both recovery parameters (0 and 1) to find the correct one
+ * Handles different v value formats for transactions vs message signatures
  *
  * @param messageHash - Hash that was signed (0x prefixed hex string)
  * @param r - R component of signature (0x prefixed hex string)
  * @param s - S component of signature (0x prefixed hex string)
  * @param expectedAddress - Expected signer address (0x prefixed)
- * @param chainId - Chain ID for EIP-155
- * @param txType - Transaction type (0 = legacy, 2 = EIP-1559)
- * @returns The correct v value
+ * @param chainId - Chain ID for EIP-155 (only used for legacy transactions)
+ * @param txType - Transaction type (0 = legacy, 2 = EIP-1559, ignored if isMessage=true)
+ * @param isMessage - True for message signatures (personal_sign, eth_sign, EIP-712), false for transactions
+ * @returns The correct v value (27/28 for messages, varies for transactions)
  */
 export async function recoverVValue(
   messageHash: string,
@@ -116,6 +117,7 @@ export async function recoverVValue(
   expectedAddress: string,
   chainId: number,
   txType: number,
+  isMessage: boolean = false,
 ): Promise<number> {
   const address = expectedAddress.toLowerCase();
 
@@ -124,7 +126,11 @@ export async function recoverVValue(
     try {
       let v: number;
 
-      if (txType === 0) {
+      if (isMessage) {
+        // Message signatures (personal_sign, eth_sign, EIP-712)
+        // Use standard Ethereum message signature format: v = 27 or 28
+        v = 27 + recoveryParam;
+      } else if (txType === 0) {
         // Legacy transaction: v = chainId * 2 + 35 + recoveryParam (EIP-155)
         v = chainId * 2 + 35 + recoveryParam;
       } else {

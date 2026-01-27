@@ -130,15 +130,15 @@ export class SatochipWallet implements ISatochipWallet {
       // 4. Parse DER signature
       const { r, s } = parseDERSignature(derSig);
 
-      // 5. Recover v value
-      const txType = 1; // anything except 0, returns a value between 0 and 1
+      // 5. Recover v value (27 or 28 for message signatures)
       const v = await recoverVValue(
         hashHexString,
         r,
         s,
         address,
         chainId,
-        txType,
+        1,
+        true, // isMessage = true for personal_sign/eth_sign
       );
 
       // 6. Concatenate to Ethereum signature format
@@ -196,15 +196,15 @@ export class SatochipWallet implements ISatochipWallet {
       // 3. Parse DER signature
       const { r, s } = parseDERSignature(derSig);
 
-      // 4. Recover v value
-      const txType = 1; // anything except 0, returns a value between 0 and 1
+      // 4. Recover v value (27 or 28 for EIP-712 typed data)
       const v = await recoverVValue(
         hashHexString,
         r,
         s,
         address,
         chainId,
-        txType,
+        1,
+        true, // isMessage = true for EIP-712 typed data
       );
 
       // 5. Concatenate to Ethereum signature format
