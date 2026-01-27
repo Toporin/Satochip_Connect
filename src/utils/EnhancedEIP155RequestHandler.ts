@@ -190,29 +190,7 @@ export async function approveEIP155RequestEnhanced(
     }
   } catch (error: any) {
     console.error('Error in enhanced EIP155 request handler:', error);
-
-    // Handle specific wallet errors
-    if (error instanceof WalletError) {
-      switch (error.type) {
-        case WalletErrorType.AUTHENTICATION_FAILED:
-          return formatJsonRpcError(
-            id,
-            'Hardware wallet authentication required',
-          );
-        case WalletErrorType.DEVICE_NOT_FOUND:
-          return formatJsonRpcError(id, 'Wallet not found or not connected');
-        case WalletErrorType.PIN_BLOCKED:
-          return formatJsonRpcError(id, 'Hardware wallet PIN is blocked');
-        case WalletErrorType.INVALID_PIN:
-          return formatJsonRpcError(id, error.message);
-        case WalletErrorType.INVALID_ADDRESS:
-          return formatJsonRpcError(id, `Invalid address: ${error.message}`);
-        default:
-          return formatJsonRpcError(id, error.message);
-      }
-    }
-
-    return formatJsonRpcError(id, error?.message || 'Unknown error occurred');
+    return formatJsonRpcError(id, 'An error occurred'); // generic error message
   } finally {
     if (wallet && wallet.type === WalletType.SATOCHIP) {
       closeNfc();
