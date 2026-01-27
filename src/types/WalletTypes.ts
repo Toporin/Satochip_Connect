@@ -95,6 +95,7 @@ export enum WalletErrorType {
   NFC_DISABLED = 'NFC_DISABLED',
   COMMUNICATION_ERROR = 'COMMUNICATION_ERROR',
   WALLET_NOT_SET = 'WALLET_NOT_SET',
+  INVALID_ADDRESS = 'INVALID_ADDRESS',
 }
 
 export class WalletError extends Error {

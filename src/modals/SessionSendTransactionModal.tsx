@@ -1,6 +1,6 @@
 import {useSnapshot} from 'valtio';
 import React, { useCallback, useRef, useState } from 'react';
-import {View, StyleSheet} from 'react-native';
+import {Alert, View, StyleSheet} from 'react-native';
 import {SignClientTypes} from '@walletconnect/types';
 
 import {Methods} from '@/components/Modal/Methods';
@@ -79,7 +79,14 @@ export default function SessionSendTransactionModal() {
           error: 'error' in response ? response.error.message : undefined,
         });
       } catch (e) {
-        console.error((e as Error).message, 'error');
+        const error = e as Error;
+        console.error(error.message, 'error');
+        // Show alert with validation error
+        Alert.alert(
+          'Error',
+          `${error.message}`,
+          [{ text: 'OK' }]
+        );
       } finally {
         setIsLoadingApprove(false);
         ModalStore.close();

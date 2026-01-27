@@ -20,6 +20,7 @@ import {
   getEIP155AddressesFromParams,
   getSignParamsMessage,
   getSignTypedDataParamsData,
+  validateTransactionAddresses,
 } from '@/utils/HelperUtil';
 import { EIP155_SIGNING_METHODS } from '@/constants/Eip155';
 import SettingsStore from '@/store/SettingsStore.ts';
@@ -147,12 +148,15 @@ export async function approveEIP155RequestEnhanced(
       case EIP155_SIGNING_METHODS.ETH_SIGN_TRANSACTION: {
         const transaction = request.params[0];
 
+        // Validate transaction addresses
+        const validatedTransaction = validateTransactionAddresses(transaction);
+
         let signedTx;
         if (wallet.type === WalletType.SATOCHIP) {
           // Use high-level SatochipWallet method
           signedTx = await withModal(async () =>
             (wallet as SatochipWallet).signEthereumTransaction(
-              transaction,
+              validatedTransaction,
               card,
               pin,
               address,
@@ -162,7 +166,7 @@ export async function approveEIP155RequestEnhanced(
         } else {
           // Software wallets can handle full transaction objects
           signedTx = await (wallet as ISoftwareWallet).signTransaction(
-            transaction,
+            validatedTransaction,
           );
         }
 
@@ -201,6 +205,8 @@ export async function approveEIP155RequestEnhanced(
           return formatJsonRpcError(id, 'Hardware wallet PIN is blocked');
         case WalletErrorType.INVALID_PIN:
           return formatJsonRpcError(id, error.message);
+        case WalletErrorType.INVALID_ADDRESS:
+          return formatJsonRpcError(id, `Invalid address: ${error.message}`);
         default:
           return formatJsonRpcError(id, error.message);
       }
