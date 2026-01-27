@@ -23,7 +23,7 @@ import PriceService from '@/services/PriceService';
 import { ChainSelector } from '@/components/ChainSelector';
 import { ConfirmationModal } from '@/components/ConfirmationModal';
 import { PinModal } from '@/components/Modal/PinModal';
-import { validateAddress, validateAmount, calculateMaxAmount, formatGasCost } from '@/utils/TransactionUtils';
+import { validateAddress, validateAmount, calculateMaxAmount, formatGasCost } from '@/utils/EIP155Utils';
 import { formatBalance, formatUSD, truncateAddress, calculateUSDValue } from '@/utils/formatters';
 import { approveEIP155RequestEnhanced } from '@/utils/EnhancedEIP155RequestHandler';
 import { EIP155_SIGNING_METHODS, EIP155_CHAINS } from '@/constants/Eip155';

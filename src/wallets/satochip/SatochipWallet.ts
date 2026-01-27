@@ -3,6 +3,9 @@
  * Phase 3: Real satochip-react-native integration with actual NFC communications
  */
 
+import { ethers } from 'ethers';
+import { SatochipCard } from 'satochip-react-native';
+
 import {
   ISatochipWallet,
   SatochipInfo,
@@ -11,7 +14,17 @@ import {
   WalletType,
 } from '@/types/WalletTypes';
 import { NFCManager } from '@/wallets/nfc/NFCManager';
-import { signWithSatochip } from '@/wallets/SatochipClientNew';
+import { signWithSatochip } from '@/wallets/satochip/SatochipClientNew';
+import {
+  TransactionRequest,
+  computeUnsignedTransactionHash,
+  createSignedTransaction,
+  getTransactionType,
+} from '@/utils/EIP155Utils';
+import {
+  parseDERSignature,
+  recoverVValue,
+} from '@/utils/SignatureUtils';
 
 export class SatochipWallet implements ISatochipWallet {
   public readonly type = WalletType.SATOCHIP;
@@ -31,12 +44,33 @@ export class SatochipWallet implements ISatochipWallet {
 
   /**
    * Sign transaction hash with Satochip
-   * todo rename to signHash (as it can be from transaction or message)
+   * Low-level method that signs a raw hash with the Satochip card
+   *
+   * @param hash - Hash to sign (Buffer)
+   * @param card - Satochip card instance
+   * @param pin - PIN for the card
+   * @returns DER-encoded signature
    */
-  public async signTransactionHash(hash: Buffer): Promise<Buffer> {
+  public async signTransactionHash(
+    hash: Buffer,
+    card: SatochipCard,
+    pin: string,
+  ): Promise<Buffer> {
     try {
+      if (!card) {
+        throw new WalletError(
+          WalletErrorType.DEVICE_NOT_FOUND,
+          'Satochip card instance is required',
+        );
+      }
 
-      // TODO: cache card + pin?
+      if (!pin) {
+        throw new WalletError(
+          WalletErrorType.AUTHENTICATION_FAILED,
+          'PIN is required for signing',
+        );
+      }
+
       const sig = await signWithSatochip(
         card,
         this.satochipInfo.masterXfp,
@@ -56,53 +90,222 @@ export class SatochipWallet implements ISatochipWallet {
     }
   }
 
+  /**
+   * Sign Ethereum message (personal_sign, eth_sign)
+   * High-level method that handles hash computation and signature recovery
+   *
+   * @param message - Message to sign (hex string or UTF-8 string)
+   * @param card - Satochip card instance
+   * @param pin - PIN for the card
+   * @param address - Expected signer address (for v recovery)
+   * @param chainId - Chain ID for signature
+   * @returns Ethereum signature (0x prefixed hex string)
+   */
+  public async signEthereumMessage(
+    message: string,
+    card: SatochipCard,
+    pin: string,
+    address: string,
+    chainId: number,
+  ): Promise<string> {
+    try {
+      // 1. Convert message to bytes
+      const messageBytes = ethers.utils.isHexString(message)
+        ? ethers.utils.arrayify(message)
+        : ethers.utils.toUtf8Bytes(message);
+
+      // 2. Compute hash
+      const hashHexString = ethers.utils.hashMessage(messageBytes);
+      const hashBytes = Buffer.from(hashHexString.slice(2), 'hex');
+
+      // 3. Sign hash
+      const derSig = await signWithSatochip(
+        card,
+        this.satochipInfo.masterXfp,
+        this.satochipInfo.derivationPath,
+        hashBytes,
+        pin,
+      );
+
+      // 4. Parse DER signature
+      const { r, s } = parseDERSignature(derSig);
+
+      // 5. Recover v value
+      const txType = 1; // anything except 0, returns a value between 0 and 1
+      const v = await recoverVValue(
+        hashHexString,
+        r,
+        s,
+        address,
+        chainId,
+        txType,
+      );
+
+      // 6. Concatenate to Ethereum signature format
+      return r + s.slice(2) + v.toString(16).padStart(2, '0');
+    } catch (error) {
+      console.error('Error signing Ethereum message:', error);
+      throw new WalletError(
+        WalletErrorType.SIGNING_FAILED,
+        'Failed to sign Ethereum message with Satochip',
+        error as Error,
+      );
+    }
+  }
+
+  /**
+   * Sign EIP-712 typed data
+   * High-level method for typed data signing
+   *
+   * @param domain - EIP-712 domain
+   * @param types - Type definitions
+   * @param data - Data to sign
+   * @param card - Satochip card instance
+   * @param pin - PIN for the card
+   * @param address - Expected signer address (for v recovery)
+   * @param chainId - Chain ID for signature
+   * @returns Ethereum signature (0x prefixed hex string)
+   */
+  public async signEIP712TypedData(
+    domain: any,
+    types: any,
+    data: any,
+    card: SatochipCard,
+    pin: string,
+    address: string,
+    chainId: number,
+  ): Promise<string> {
+    try {
+      // 1. Compute typed data hash
+      const hashHexString = ethers.utils._TypedDataEncoder.hash(
+        domain,
+        types,
+        data,
+      );
+      const hashBytes = Buffer.from(hashHexString.slice(2), 'hex');
+
+      // 2. Sign hash
+      const derSig = await signWithSatochip(
+        card,
+        this.satochipInfo.masterXfp,
+        this.satochipInfo.derivationPath,
+        hashBytes,
+        pin,
+      );
+
+      // 3. Parse DER signature
+      const { r, s } = parseDERSignature(derSig);
+
+      // 4. Recover v value
+      const txType = 1; // anything except 0, returns a value between 0 and 1
+      const v = await recoverVValue(
+        hashHexString,
+        r,
+        s,
+        address,
+        chainId,
+        txType,
+      );
+
+      // 5. Concatenate to Ethereum signature format
+      return r + s.slice(2) + v.toString(16).padStart(2, '0');
+    } catch (error) {
+      console.error('Error signing EIP-712 typed data:', error);
+      throw new WalletError(
+        WalletErrorType.SIGNING_FAILED,
+        'Failed to sign EIP-712 typed data with Satochip',
+        error as Error,
+      );
+    }
+  }
+
+  /**
+   * Sign Ethereum transaction
+   * High-level method that handles full transaction signing and serialization
+   *
+   * @param transaction - Transaction request object
+   * @param card - Satochip card instance
+   * @param pin - PIN for the card
+   * @param address - Expected signer address (for v recovery)
+   * @param chainId - Chain ID for transaction
+   * @returns Serialized signed transaction (0x prefixed hex string)
+   */
+  public async signEthereumTransaction(
+    transaction: TransactionRequest,
+    card: SatochipCard,
+    pin: string,
+    address: string,
+    chainId: number,
+  ): Promise<string> {
+    try {
+      // 1. Compute unsigned transaction hash
+      const { hash: unsignedHash, unsignedTx } =
+        computeUnsignedTransactionHash(transaction, chainId);
+      const unsignedHashBytes = Buffer.from(unsignedHash.slice(2), 'hex');
+
+      // 2. Sign hash
+      const derSig = await signWithSatochip(
+        card,
+        this.satochipInfo.masterXfp,
+        this.satochipInfo.derivationPath,
+        unsignedHashBytes,
+        pin,
+      );
+
+      // 3. Parse DER signature
+      const { r, s } = parseDERSignature(derSig);
+
+      // 4. Recover v value
+      const txType = getTransactionType(transaction);
+      const v = await recoverVValue(
+        unsignedHash,
+        r,
+        s,
+        address,
+        chainId,
+        txType,
+      );
+
+      // 5. Create signed transaction
+      return createSignedTransaction(unsignedTx, r, s, v, chainId);
+    } catch (error) {
+      console.error('Error signing Ethereum transaction:', error);
+      throw new WalletError(
+        WalletErrorType.SIGNING_FAILED,
+        'Failed to sign Ethereum transaction with Satochip',
+        error as Error,
+      );
+    }
+  }
+
   // Base wallet interface methods
   public getAddress(): string {
     return this.satochipInfo.address;
   }
 
-  public async signMessage(message: string | Uint8Array): Promise<string> {
-    try {
-      const messageHash =
-        typeof message === 'string'
-          ? Buffer.from(message, 'utf8')
-          : Buffer.from(message);
-
-      const signature = await this.signTransactionHash(messageHash);
-      return signature.toString('hex');
-    } catch (error) {
-      console.error('Error signing message:', error);
-      throw new WalletError(
-        WalletErrorType.SIGNING_FAILED,
-        'Failed to sign message with Satochip',
-        error as Error,
-      );
-    }
+  public async signMessage(_message: string | Uint8Array): Promise<string> {
+    throw new WalletError(
+      WalletErrorType.UNSUPPORTED_OPERATION,
+      'Use signEthereumMessage() instead - requires card and pin parameters',
+    );
   }
 
-  public async signTypedData(domain: any, types: any, data: any): Promise<string> {
-    return "TODO";
+  public async signTypedData(
+    _domain: any,
+    _types: any,
+    _data: any,
+  ): Promise<string> {
+    throw new WalletError(
+      WalletErrorType.UNSUPPORTED_OPERATION,
+      'Use signEIP712TypedData() instead - requires card and pin parameters',
+    );
   }
 
-  public async signTransaction(transaction: any): Promise<string> {
-    try {
-      console.log(`signTransaction transaction: ${transaction}`);
-      console.log(JSON.stringify(transaction));
-      console.log(`signTransaction transaction.hash: ${transaction.hash}`);
-
-      // compute the hash here
-      const hash = Buffer.from(transaction.hash || transaction, 'hex');
-      console.log(`signTransaction hash: ${hash.toString('hex')}`);
-      const signature = await this.signTransactionHash(hash);
-      return signature.toString('hex');
-    } catch (error) {
-      console.error('Error signing transaction:', error);
-      throw new WalletError(
-        WalletErrorType.SIGNING_FAILED,
-        'Failed to sign transaction with Satochip',
-        error as Error,
-      );
-    }
+  public async signTransaction(_transaction: any): Promise<string> {
+    throw new WalletError(
+      WalletErrorType.UNSUPPORTED_OPERATION,
+      'Use signEthereumTransaction() instead - requires card and pin parameters',
+    );
   }
 
   public async isAvailable(): Promise<boolean> {

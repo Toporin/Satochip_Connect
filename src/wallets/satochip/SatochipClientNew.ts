@@ -1,4 +1,4 @@
-/* eslint-disable no-await-in-loop */
+ 
 import { Platform } from 'react-native';
 import { SatochipCard, SatochipCardError } from 'satochip-react-native';
 import NfcManager from 'react-native-nfc-manager';
