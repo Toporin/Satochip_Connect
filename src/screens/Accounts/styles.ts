@@ -115,4 +115,18 @@ export default StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  buySatochipButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    marginTop: 16,
+  },
+  buySatochipText: {
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
 });

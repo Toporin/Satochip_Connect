@@ -4,10 +4,13 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
+  Linking,
+  Image,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import Toast from 'react-native-toast-message';
 import { useSnapshot } from 'valtio';
+import ShoppingCartIcon from '@/assets/images/shopping_cart.svg';
 
 import { useTheme } from '@/hooks/useTheme';
 import SettingsStore from '@/store/SettingsStore';
@@ -106,6 +109,10 @@ export default function AccountsScreen({ navigation }: Props) {
 
   const handleAddSoftwareAccount = () => {
     navigation.navigate('SetupSoftwareAccount');
+  };
+
+  const handleBuySatochip = () => {
+    Linking.openURL('https://satochip.io/product/satochip/');
   };
 
   const renderAccountCard = (account: AccountItem) => {
@@ -241,6 +248,17 @@ export default function AccountsScreen({ navigation }: Props) {
           </View>
         )}
       </View>
+
+      {/* Buy Satochip Button */}
+      <TouchableOpacity
+        style={[styles.buySatochipButton, { backgroundColor: Theme['bg-175'] }]}
+        onPress={handleBuySatochip}
+        activeOpacity={0.7}>
+        <ShoppingCartIcon width={24} height={24} fill={Theme['accent-100']} />
+        <Text style={[styles.buySatochipText, { color: Theme['fg-100'] }]}>
+          You don't have a Satochip yet?{'\n'}Click here to buy one.
+        </Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
