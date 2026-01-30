@@ -31,7 +31,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>rn-web3wallet-debug</string>
+				<string>satochip-connect-debug</string>
 			</array>
 		</dict>
 	</array>

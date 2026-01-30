@@ -30,7 +30,7 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
         <intent-filter>
-          <data android:scheme="rn-web3wallet" />
+          <data android:scheme="satochip-connect" />
           <action android:name="android.intent.action.VIEW" />
           <category android:name="android.intent.category.DEFAULT" />
           <category android:name="android.intent.category.BROWSABLE" />
@@ -43,8 +43,8 @@
         </intent-filter>
         <intent-filter android:autoVerify="true">
           <data android:scheme="https"/>
-          <data android:host="lab.reown.com"/>
-          <data android:pathPrefix="/rn_walletkit"/>
+          <data android:host="satochip.io"/>
+          <data android:pathPrefix="/satochip_connect"/>
           <action android:name="android.intent.action.VIEW" />
           <category android:name="android.intent.category.DEFAULT" />
           <category android:name="android.intent.category.BROWSABLE" />
