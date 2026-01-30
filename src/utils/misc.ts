@@ -1,9 +1,9 @@
 export const getMetadata = () => {
   return {
     name: 'Satochip Connect',
-    description: 'Satochip Connect',
-    url: 'https://reown.com/walletkit',
-    icons: ['https://avatars.githubusercontent.com/u/179229932'],
+    description: 'Satochip Connect wallet',
+    url: 'https://satochip.io',
+    icons: ['https://avatars.githubusercontent.com/u/10826856'],
     redirect: {
       native: 'satochip-connect-debug://',
       universal: 'https://satochip.io/satochip_connect_debug',
