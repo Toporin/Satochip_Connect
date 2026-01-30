@@ -19,6 +19,7 @@ import {
 } from '@/wallets/satochip/SatochipClientNew';
 import RNModal from 'react-native-modal';
 import { SatochipStatusModal } from '@/modals/SatochipStatusModal.tsx';
+import Toast from 'react-native-toast-message';
 
 type Props = SettingsStackScreenProps<'Settings'>;
 
@@ -64,7 +65,7 @@ export default function Settings({navigation}: Props) {
       try {
 
         // if pin is defined, use it to verify PIN, as required for authenticity check
-        const { setupDone, isSeeded, isAuthentic, authenticityMsg } = await withModal(async () => getCardInfo(card, userPin))();
+        const { setupDone, isSeeded, isAuthentic, authenticityMsg } = await withModal(async () => getCardInfo(card, userPin))?.();
         setSatochipSetupDone(setupDone);
         setSatochipIsSeeded(isSeeded);
         setSatochipIsAuthentic(isAuthentic);
@@ -72,8 +73,12 @@ export default function Settings({navigation}: Props) {
         setShowStatusModal(true);
       } catch (error) {
         const errorMessage = handleSatochipError(error);
-        if (errorMessage) {
-          //showToast(errorMessage, <ToastErrorIcon />, IToastCategory.DEFAULT, 3000, true); // TODO
+        if (errorMessage){
+          Toast.show({
+            type: 'error',
+            text1: 'Failed to check status',
+            text2: errorMessage,
+          });
         }
       } finally {
         closeNfc();

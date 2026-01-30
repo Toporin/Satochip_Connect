@@ -198,14 +198,10 @@ export const readSatochip = async (card: SatochipCard, pin: string) => {
 };
 
 export const handleSatochipError = (error) => {
-  let errorMessage = error.toString();
-
-  if (!errorMessage) {
-    errorMessage = 'Something went wrong, please try again!';
+  let errorMessage = error.toString() || 'Something went wrong, please try again!';
+  if (Platform.OS === 'ios'){
+    NfcManager.invalidateSessionWithErrorIOS(errorMessage); //NFC.showiOSErrorMessage(errorMessage);
   }
-
-  if (Platform.OS === 'ios') NfcManager.invalidateSessionWithErrorIOS(errorMessage); //NFC.showiOSErrorMessage(errorMessage);
-
   return errorMessage;
 };
 

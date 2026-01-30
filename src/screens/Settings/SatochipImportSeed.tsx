@@ -73,11 +73,11 @@ export default function SatochipImportSeed({ navigation }: Props) {
         throw new Error(`Unexpected seed type: ${typeof masterSeed}`)
       }
 
-      await withModal(async () => importSeed(card, pin, seedBytes))();
+      await withModal(async () => importSeed(card, pin, seedBytes))?.();
       setSuccess(true);
     } catch (error) {
       setSuccess(false);
-      const errorMessage = handleSatochipError(error, navigation);
+      const errorMessage = handleSatochipError(error);
       if (errorMessage) {
         setErrorMsg(errorMessage);
       }
@@ -86,7 +86,7 @@ export default function SatochipImportSeed({ navigation }: Props) {
       closeNfc();
       card.endNfcSession();
     }
-  }, [pin, mnemonic, passphrase, navigation, card, closeNfc, withModal]);
+  }, [pin, mnemonic, passphrase, card, closeNfc, withModal]);
 
   useEffect(() => {
     const isPinValid = pin?.length >= 4 && pin?.length <= 16;
