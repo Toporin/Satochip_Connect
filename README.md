@@ -39,6 +39,41 @@ This wallet is ideal for:
 
 >**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
 
+### iOS setup
+
+Install node & nvm
+
+```
+brew install nvm
+# Follow the post-install instructions to add nvm to your shell profile
+nvm install --lts
+nvm use --lts
+```
+
+Add the following to your shell profile e.g. ~/.profile or ~/.zshrc:
+```
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "/usr/local/opt/nvm/nvm.sh" ] && \. "/usr/local/opt/nvm/nvm.sh"  # This loads nvm
+  [ -s "/usr/local/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/usr/local/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
+```
+
+Use corepack to  manage yarn:
+```
+corepack enable
+```
+
+Install CocoaPods:
+```
+brew install cocoapods
+```
+
+Install Xcode from the App Store (if you haven't already) then switch xcode-select to use the full Xcode app:
+```
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -license accept
+```
+
+
 ### Step 1: Install Dependencies
 
 ```bash
@@ -75,6 +110,12 @@ yarn ios
 ```
 
 If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly.
+
+To list your devices:
+```
+xcrun xctrace list devices
+```
+
 
 This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
 
