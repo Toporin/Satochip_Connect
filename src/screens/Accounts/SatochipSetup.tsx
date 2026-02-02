@@ -307,7 +307,7 @@ export default function SatochipSetupScreen({ navigation, route }: Props) {
             </Text>
             <Text style={[styles.modalSubtitle, { color: Theme['fg-150'] }]}>
               {success
-                ? 'Your software account has been created successfully!'
+                ? 'Your Satochip account has been created successfully!'
                 : errorMsg}
             </Text>
 

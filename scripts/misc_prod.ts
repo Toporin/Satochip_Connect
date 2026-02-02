@@ -1,12 +1,12 @@
 export const getMetadata = () => {
   return {
-    name: 'React Native Wallet Example',
-    description: 'React Native WalletKit by Reown',
-    url: 'https://reown.com/walletkit',
-    icons: ['https://avatars.githubusercontent.com/u/179229932'],
+    name: 'Satochip Connect',
+    description: 'Satochip Connect wallet',
+    url: 'https://satochip.io',
+    icons: ['https://avatars.githubusercontent.com/u/10826856'],
     redirect: {
-      native: 'rn-web3wallet://',
-      universal: 'https://lab.reown.com/rn_walletkit',
+      native: 'satochip-connect://',
+      universal: 'https://satochip.io/satochip_connect',
       linkMode: true,
     },
   };

@@ -2,15 +2,15 @@
 	<application>
 			<activity android:name=".MainActivity">
 				<intent-filter>
-          <data android:scheme="rn-web3wallet-internal" />
+          <data android:scheme="satochip-connect-internal" />
           <action android:name="android.intent.action.VIEW" />
           <category android:name="android.intent.category.DEFAULT" />
           <category android:name="android.intent.category.BROWSABLE" />
         </intent-filter>
         <intent-filter android:autoVerify="true">
           <data android:scheme="https"/>
-          <data android:host="lab.reown.com"/>
-          <data android:pathPrefix="/rn_walletkit_internal"/>
+          <data android:host="satochip.io"/>
+          <data android:pathPrefix="/satochip_connect_internal"/>
           <action android:name="android.intent.action.VIEW" />
           <category android:name="android.intent.category.DEFAULT" />
           <category android:name="android.intent.category.BROWSABLE" />

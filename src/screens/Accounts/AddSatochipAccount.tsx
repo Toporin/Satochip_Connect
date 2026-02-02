@@ -4,8 +4,6 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  Alert,
-  ActivityIndicator,
   TextInput,
 } from 'react-native';
 
@@ -22,6 +20,7 @@ import NfcPrompt from '@/components/NfcPromptAndroid.tsx';
 import useSatochipModal from '@/hooks/useSatochipModal.ts';
 import setupStyles from '@/screens/Accounts/setupStyles.ts';
 import { hp } from '@/constants/responsive.tsx';
+import Toast from 'react-native-toast-message';
 
 type Props = AccountsStackScreenProps<'AddSatochipAccount'>;
 
@@ -30,35 +29,41 @@ export default function AddSatochipAccountScreen({ navigation }: Props) {
   const [isScanning, setIsScanning] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [pin, setPin] = useState('');
-  const [satochipSetupDone, setSatochipSetupDone] = useState(null);
-  const [satochipIsSeeded, setSatochipIsSeeded] = useState(null);
-  const [satochipIsAuthentic, setSatochipIsAuthentic] = useState(null);
-  const [satochipStatusCode, setSatochipStatusCode] = useState(null);
+  const [satochipSetupDone, setSatochipSetupDone] = useState(false);
+  const [satochipIsSeeded, setSatochipIsSeeded] = useState(false);
+  const [satochipIsAuthentic, setSatochipIsAuthentic] = useState(false);
+  const [satochipStatusCode, setSatochipStatusCode] = useState("");
 
   const card = useRef(new SatochipCard()).current;
   const { withModal, nfcVisible, closeNfc } = useSatochipModal(card);
 
   const handleScanCard = useCallback(async () => {
     try {
+      let setupDone = false, isSeeded= false, isAuthentic: boolean | null = false, authenticityMsg = "";
+      let xpub= "", masterFingerprint= "";
+      await withModal(async() => {
 
-      // if pin is defined, use it to verify PIN, as required for authenticity check
-      const { setupDone, isSeeded, isAuthentic, authenticityMsg } = await withModal(async () => getCardInfo(card, pin))();
-      setSatochipSetupDone(setupDone);
-      setSatochipIsSeeded(isSeeded);
-      setSatochipIsAuthentic(isAuthentic);
-      setSatochipStatusCode(authenticityMsg);
+        ({ setupDone, isSeeded, isAuthentic, authenticityMsg } = await getCardInfo(card, pin));
+        setSatochipSetupDone(setupDone);
+        setSatochipIsSeeded(isSeeded);
+        setSatochipIsAuthentic(isAuthentic);
+        setSatochipStatusCode(authenticityMsg);
 
-      const { xpub, masterFingerprint  } = await withModal(async () =>
-        getSatochipDetails(card, pin,"m/44'/60'/0'/")
-      )();
+        ({ xpub, masterFingerprint  } = await getSatochipDetails(card, pin,"m/44'/60'/0'/"));
+      })?.();
 
       // Navigate to setup screen
       navigation.navigate('SatochipSetup', { masterXfp: masterFingerprint, xpub, isAuthentic, authenticityMsg });
 
     } catch (error) {
+      console.error(`handleScanCard error: ${error.message}`);
       const errorMessage = handleSatochipError(error);
-      if (errorMessage) {
-        //showToast(errorMessage, <ToastErrorIcon />, IToastCategory.DEFAULT, 3000, true); // TODO
+      if (errorMessage){
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to add account',
+          text2: errorMessage,
+        });
       }
     } finally {
       closeNfc();
@@ -168,20 +173,20 @@ export default function AddSatochipAccountScreen({ navigation }: Props) {
         <TouchableOpacity
           style={[
             addAccountStyles.scanButton,
-            { 
-              backgroundColor: (isScanning || isConnecting) 
-                ? Theme['bg-250'] 
-                : Theme['accent-100'] 
+            {
+              backgroundColor: (isScanning || isConnecting)
+                ? Theme['bg-250']
+                : Theme['accent-100']
             }
           ]}
           onPress={handleScanCard}
           disabled={isScanning || isConnecting || !pin }>
           <Text style={[
             addAccountStyles.scanButtonText,
-            { 
+            {
               color: (isScanning || isConnecting || !pin )
-                ? Theme['fg-300'] 
-                : Theme['inverse-100'] 
+                ? Theme['fg-300']
+                : Theme['inverse-100']
             }
           ]}>
             {isScanning ? 'Scanning...' : isConnecting ? 'Connecting...' : 'Scan Satochip Card'}
@@ -194,7 +199,7 @@ export default function AddSatochipAccountScreen({ navigation }: Props) {
           Need help?
         </Text>
         <Text style={[addAccountStyles.helpDescription, { color: Theme['fg-150'] }]}>
-          Make sure your Satochip card is working properly and that NFC is enabled on your device. 
+          Make sure your Satochip card is working properly and that NFC is enabled on your device.
           The card should be held close to the NFC antenna, usually located on the back of your phone.
         </Text>
       </View>

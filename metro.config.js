@@ -4,11 +4,6 @@ const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-// Add local package to watch folders
-config.watchFolders = [
-  path.resolve(__dirname, '/home/satochip/Documents/goose/satochip-react-native')
-];
-
 // Add SVG transformer configuration
 config.transformer = {
   ...config.transformer,
@@ -22,7 +17,6 @@ config.resolver = {
   sourceExts: [...config.resolver.sourceExts, 'svg'],
   nodeModulesPaths: [
     path.resolve(__dirname, 'node_modules'),
-    path.resolve(__dirname, '/home/satochip/Documents/goose/satochip-react-native/node_modules')
   ]
 };
 

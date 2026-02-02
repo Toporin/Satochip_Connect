@@ -25,8 +25,8 @@ Sentry.init({
   // Enable Logs
   enableLogs: true,
 
-  // Temporarily disable native for Android, not sure why it's not working
-  enableNative: Platform.OS === 'ios',
+  // Temporarily disable native for Android & iOS, not sure why it's not working
+  enableNative: false,
 
   // Configure Session Replay
   replaysSessionSampleRate: 0.1,
