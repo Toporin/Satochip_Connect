@@ -87,7 +87,7 @@ export default function useWalletKitEventsManager(initialized: boolean) {
     (authRequest: SignClientTypes.EventArguments['session_authenticate']) => {
       console.log('onSessionAuthenticate', authRequest);
       const chains = authRequest.params.authPayload.chains.filter(
-        chain => !!EIP155_CHAINS[chain.split(':')[1]],
+        chain => !!EIP155_CHAINS[chain],
       );
 
       if (chains.length === 0) {
