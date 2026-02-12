@@ -116,12 +116,27 @@ To list your devices:
 xcrun xctrace list devices
 ```
 
-
 This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
 
 ### Step 5: Build APK
 
-Debug APK: 
+#### Update app version
+
+For Android, update app version in `./android/app/build.gradle` using semantic versioning: versionName & versionCode.
+
+For iOS, update app version in ./ios/RNWeb3Wallet.xcodeproj: MARKETING_VERSION & CURRENT_PROJECT_VERSION:
+Using a script on MacOS:
+```bash
+sed -i '' 's/MARKETING_VERSION = .*/MARKETING_VERSION = 0.1.0;/' ios/RNWeb3Wallet.xcodeproj/project.pbxproj
+sed -i '' 's/CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = 100;/' ios/RNWeb3Wallet.xcodeproj/project.pbxproj
+```
+On linux, use:
+```bash
+sed -i 's/MARKETING_VERSION = .*/MARKETING_VERSION = 0.1.0;/' ios/RNWeb3Wallet.xcodeproj/project.pbxproj
+sed -i 's/CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = 100;/' ios/RNWeb3Wallet.xcodeproj/project.pbxproj
+```
+
+#### Build debug APK: 
 ```bash
 yarn build-android-debug
 cd android
