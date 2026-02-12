@@ -40,7 +40,7 @@ const SendTransactionScreen: React.FC = () => {
   const Theme = useTheme();
   const navigation = useNavigation<SendTransactionNavigationProp>();
   const route = useRoute<SendTransactionRouteProp>();
-  const { accountId, chainId: initialChainId } = route.params;
+  const { accountId, chainId: initialChainId, chainIds } = route.params;
 
   // Get wallet
   const wallet = SettingsStore.getWallet(accountId);
@@ -432,6 +432,7 @@ const SendTransactionScreen: React.FC = () => {
             <ChainSelector
               selectedChainId={selectedChainId}
               onSelect={handleChainChange}
+              supportedChainIds={chainIds}
             />
           </View>
 

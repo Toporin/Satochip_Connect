@@ -84,7 +84,7 @@ export type AccountsStackParamList = {
   SatochipSetup: { masterXfp: string, xpub: string, isAuthentic: boolean, authenticityMsg: string };
   SetupSoftwareAccount: undefined;
   AccountDetails: { accountId: string };
-  SendTransaction: { accountId: string; chainId?: number };
+  SendTransaction: { accountId: string; chainId?: number, chainIds?: number[] };
 };
 
 export type SettingsStackParamList = {

@@ -27,7 +27,7 @@ export const ChainSelector: React.FC<ChainSelectorProps> = ({
   const [modalVisible, setModalVisible] = useState(false);
 
   // Get all available chains or filter to supported ones
-  const availableChainIds = supportedChainIds || Object.keys(EIP155_RPCS_BY_CHAINS).map(Number);
+  const availableChainIds = supportedChainIds || Object.keys(EIP155_CHAINS).map(key => Number(key.split(':')[1]));
 
   // Get selected chain info
   const selectedChainKey = `eip155:${selectedChainId}`;

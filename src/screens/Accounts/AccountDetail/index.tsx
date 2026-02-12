@@ -268,7 +268,8 @@ export default function AccountDetail({ route, navigation }: Props) {
             ]}
             onPress={() => navigation.navigate('SendTransaction', {
               accountId: accountId,
-              chainId: getDefaultChainId()
+              chainId: getDefaultChainId(),
+              chainIds: addressBalances.map(entry => entry.chainId),
             })}
             activeOpacity={0.7}>
             <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
