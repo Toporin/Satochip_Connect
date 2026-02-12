@@ -187,6 +187,16 @@ const SendTransactionScreen: React.FC = () => {
           selectedChainId
         );
         setGasLimit(estimatedGas);
+
+        // check that amount is still valid after new gasLimit
+        const effectiveGasPrice = gasPrice || maxFeePerGas || '0';
+        const maxAmount = calculateMaxAmount(balance, estimatedGas, effectiveGasPrice);
+        const maxAmountBN = ethers.utils.parseEther(maxAmount);
+        const amountBN = ethers.utils.parseEther(amount);
+        if (amountBN.gt(maxAmountBN)) {
+          setAmount(maxAmount);
+        }
+
       } catch (error) {
         console.error('[SendTransaction] Error estimating gas:', error);
         setGasLimit('0x5208'); // Fallback to 21000
