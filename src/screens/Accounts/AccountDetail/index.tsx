@@ -146,6 +146,7 @@ export default function AccountDetail({ route, navigation }: Props) {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
+      // todo: fetch only current wallet?
       await fetchBalancesForAllWallets();
     } catch (error) {
       console.error('Failed to refresh balances:', error);

@@ -180,10 +180,12 @@ class BalanceService {
   }
 
   /**
-   * Get all supported chain IDs from EIP155_RPCS_BY_CHAINS
+   * Get all supported chain IDs from EIP155_CHAINS
    */
   getSupportedChainIds(): number[] {
-    return Object.keys(EIP155_RPCS_BY_CHAINS).map(Number);
+    //return Object.keys(EIP155_RPCS_BY_CHAINS).map(Number);
+    return Object.keys(EIP155_CHAINS).map(key => Number(key.split(':')[1]));
+
   }
 }
 

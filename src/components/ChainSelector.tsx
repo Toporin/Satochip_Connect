@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { PresetsUtil } from '@/utils/PresetsUtil';
-import { EIP155_RPCS_BY_CHAINS, EIP155_CHAINS } from '@/constants/Eip155';
+import { EIP155_CHAINS } from '@/constants/Eip155';
 
 interface ChainSelectorProps {
   selectedChainId: number;
