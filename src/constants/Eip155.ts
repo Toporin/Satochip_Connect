@@ -108,12 +108,12 @@ export const EIP155_CHAINS: Record<string, Chain> = {
     symbol: 'POL',
     rpcUrl: 'https://polygon-rpc.com',
   },
-  'eip155:80001': {
-    chainId: '80001',
+  'eip155:80002': {
+    chainId: '80002',
     namespace: 'eip155',
-    name: 'Polygon Mumbai',
-    symbol: 'MATIC',
-    rpcUrl: 'https://rpc.ankr.com/polygon_mumbai',
+    name: 'Polygon Amoy',
+    symbol: 'POL',
+    rpcUrl: 'https://rpc-amoy.polygon.technology',
   },
   'eip155:100': {
     chainId: '100',
@@ -214,7 +214,7 @@ export const EIP155_NETWORK_IMAGES: Record<string, ImageSourcePropType> = {
   'eip155:10': Optimism,
   'eip155:11155420': Optimism,
   'eip155:137': Polygon,
-  'eip155:80001': Polygon,
+  'eip155:80002': Polygon,
   'eip155:100': Gnosis,
   'eip155:9001': Evmos,
   'eip155:324': ZkSync,
@@ -268,10 +268,12 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
     'https://polygon.llamarpc.com',
   ],
 
-  // Polygon Mumbai Testnet
-  80001: [
-    'https://rpc.ankr.com/polygon_mumbai',
-    'https://polygon-mumbai.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161',
+  // Polygon Amoy Testnet
+  80002: [
+    'https://rpc-amoy.polygon.technology',
+    'https://polygon-amoy.drpc.org',
+    'https://polygon-amoy-public.nodies.app',
+    'https://polygon-amoy.api.onfinality.io/public',
   ],
 
   // BSC Mainnet
@@ -333,7 +335,10 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
 
   // Fantom Mainnet
   250: [
-    'https://rpc.ankr.com/fantom',
+    'https://rpc.fantom.network',
+    'https://rpc2.fantom.network',
+    'https://fantom-public.nodies.app',
+    'https://fantom.drpc.org',
     'https://1rpc.io/ftm',
   ],
 
