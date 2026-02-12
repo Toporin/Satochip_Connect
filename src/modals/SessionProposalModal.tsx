@@ -109,6 +109,8 @@ export default function SessionProposalModal() {
           peerRedirect: session.peer.metadata.redirect,
           isLinkMode: session?.transportType === 'link_mode',
         });
+
+        console.info(`[SessionProposalModal] Session approved by user`);
       } catch (e) {
         console.error((e as Error).message, 'error');
         Toast.show({
@@ -136,6 +138,8 @@ export default function SessionProposalModal() {
           isLinkMode: false,
           error: 'User rejected connect request',
         });
+
+        console.info(`[SessionProposalModal] Session rejected by user`);
       } catch (e) {
         console.error((e as Error).message, 'error');
         return;

@@ -69,13 +69,15 @@ export default function SatochipImportSeed({ navigation }: Props) {
         console.log('SatochipImportSeed - got seed as Uint8Array');
         seedBytes = Buffer.from(masterSeed);
       } else {
-        console.log('SatochipImportSeed - got seed as unexpected type:', typeof masterSeed);
+        console.error('SatochipImportSeed - got seed as unexpected type:', typeof masterSeed);
         throw new Error(`Unexpected seed type: ${typeof masterSeed}`)
       }
 
       await withModal(async () => importSeed(card, pin, seedBytes))?.();
+      console.info(`[SatochipImportSeed] Seed imported successfully!`);
       setSuccess(true);
     } catch (error) {
+      console.error(`[SatochipImportSeed] Failed to import seed: ${error}`);
       setSuccess(false);
       const errorMessage = handleSatochipError(error);
       if (errorMessage) {

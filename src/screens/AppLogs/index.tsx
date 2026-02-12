@@ -16,7 +16,7 @@ export function AppLogs() {
 
   // Initialize with all levels selected
   const [selectedLevels, setSelectedLevels] = useState<Set<LogLevel>>(
-    new Set(['log', 'info', 'warn', 'error', 'debug']),
+    new Set(['error', 'warn', 'info']), // do not show log & debug by default
   );
 
   const handleToggleLevel = (level: LogLevel) => {

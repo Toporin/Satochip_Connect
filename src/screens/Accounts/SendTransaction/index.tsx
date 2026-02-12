@@ -371,6 +371,7 @@ const SendTransactionScreen: React.FC = () => {
 
   // Render success state
   if (txHash) {
+    console.info(`[SendTransaction] Transaction sent with hash: ${txHash}`);
     return (
       <View style={[styles.container, { backgroundColor: Theme['bg-100'] }]}>
         <View style={styles.errorContainer}>

@@ -78,6 +78,8 @@ export default function SessionSendTransactionModal() {
           isLinkMode: isLinkMode,
           error: 'error' in response ? response.error.message : undefined,
         });
+
+        console.info(`[SessionSendTransactionModal] Transaction approved by user`);
       } catch (e) {
         const error = e as Error;
         console.error(error.message, 'error');
@@ -133,6 +135,7 @@ export default function SessionSendTransactionModal() {
           topic,
           response,
         });
+        console.info(`[SessionSendTransactionModal] Transaction rejected by user`);
       } catch (e) {
         console.error((e as Error).message, 'error');
       } finally {

@@ -43,8 +43,10 @@ export default function SatochipResetSeed({ navigation }: Props) {
   const activateSeedResetAction = React.useCallback(async () => {
     try {
       await withModal(async () => resetSeed(card, pin))();
+      console.info(`[SatochipResetSeed] Seed reset successfully!`);
       setSuccess(true);
     } catch (error) {
+      console.error(`[SatochipResetSeed] Failed to reset seed: ${error}`);
       setSuccess(false);
       const errorMessage = handleSatochipError(error, navigation);
       if (errorMessage) {

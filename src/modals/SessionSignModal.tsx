@@ -83,6 +83,8 @@ export default function SessionSignModal() {
             isLinkMode: isLinkMode,
             error: 'error' in response ? response.error.message : undefined,
           });
+
+          console.info(`[SessionSignModal] Message signature approved by user`);
         } catch (e) {
           const error = e as Error;
           console.error(error.message, 'error');
@@ -147,6 +149,7 @@ export default function SessionSignModal() {
           isLinkMode: isLinkMode,
           error: 'User rejected signature request',
         });
+        console.info(`[SessionSignModal] Message signature rejected by user`);
       } catch (e) {
         setIsLoadingReject(false);
         console.error((e as Error).message, 'error');

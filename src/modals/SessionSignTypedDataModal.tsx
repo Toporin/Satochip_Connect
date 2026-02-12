@@ -72,6 +72,8 @@ export default function SessionSignTypedDataModal() {
           isLinkMode: isLinkMode,
           error: 'error' in response ? response.error.message : undefined,
         });
+
+        console.info(`[SessionSignTypedDataModal] signature approved by user`);
       } catch (e) {
         const error = e as Error;
         console.error(error.message, 'error');
@@ -126,6 +128,7 @@ export default function SessionSignTypedDataModal() {
           topic,
           response,
         });
+        console.info(`[SessionSignTypedDataModal] signature rejected by user`);
       } catch (e) {
         console.error((e as Error).message, 'error');
         return;

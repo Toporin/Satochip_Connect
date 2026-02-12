@@ -9,7 +9,7 @@ export interface LogFilterProps {
   onToggleLevel: (level: LogLevel) => void;
 }
 
-const LOG_LEVELS: LogLevel[] = ['log', 'info', 'warn', 'error', 'debug'];
+const LOG_LEVELS: LogLevel[] = ['error', 'warn', 'info', 'log', 'debug'];
 
 export function LogFilter({selectedLevels, onToggleLevel}: LogFilterProps) {
   const Theme = useTheme();

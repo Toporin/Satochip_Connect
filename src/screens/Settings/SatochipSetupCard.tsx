@@ -50,8 +50,10 @@ export default function SatochipSetupCard({ navigation }: Props) {
   const setupPinAction = React.useCallback(async () => {
     try {
       await withModal(async () => setupCard(card, newPIN))();
+      console.info(`[SatochipSetupCard] Card setup successfully!`);
       setSuccess(true);
     } catch (error) {
+      console.error(`[SatochipSetupCard] Failed to setup card: ${error}`);
       setSuccess(false);
       const errorMessage = handleSatochipError(error, navigation);
       if (errorMessage) {

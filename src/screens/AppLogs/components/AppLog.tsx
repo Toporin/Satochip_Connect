@@ -64,23 +64,23 @@ export function AppLog({value}: AppLogProps) {
           time: <Text variant="small-400">{formatTime(log.time)}</Text>
         </Text>
       </View>
-      <View style={styles.row}>
-        <Text variant="small-600">
-          context: <Text variant="small-400">{log.context}</Text>
-        </Text>
-      </View>
+      {/*<View style={styles.row}>*/}
+      {/*  <Text variant="small-600">*/}
+      {/*    context: <Text variant="small-400">{log.context}</Text>*/}
+      {/*  </Text>*/}
+      {/*</View>*/}
       <View style={styles.row}>
         <Text variant="small-600">
           message: <Text variant="small-400">{log.message}</Text>
         </Text>
       </View>
-      {log.args && log.args.length > 0 && (
-        <View style={styles.row}>
-          <Text variant="small-600">
-            args: <Text variant="small-400">{JSON.stringify(log.args)}</Text>
-          </Text>
-        </View>
-      )}
+      {/*{log.args && log.args.length > 0 && (*/}
+      {/*  <View style={styles.row}>*/}
+      {/*    <Text variant="small-600">*/}
+      {/*      args: <Text variant="small-400">{JSON.stringify(log.args)}</Text>*/}
+      {/*    </Text>*/}
+      {/*  </View>*/}
+      {/*)}*/}
     </TouchableOpacity>
   );
 }
