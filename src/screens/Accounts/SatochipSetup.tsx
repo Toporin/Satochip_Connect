@@ -74,7 +74,7 @@ export default function SatochipSetupScreen({ navigation, route }: Props) {
       // todo: check that address not already used!
       setCurrentAddress(address);
     } catch (error) {
-      console.error('SetupSoftwareAccountScreen - error deriving preview address:', error);
+      console.error('SatochipSetupScreen - error deriving preview address:', error);
       setCurrentAddress('');
     }
   }, [xpub, derivationPath]);

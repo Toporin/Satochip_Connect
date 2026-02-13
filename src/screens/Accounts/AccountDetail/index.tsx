@@ -42,32 +42,15 @@ export default function AccountDetail({ route, navigation }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const wallet = useMemo(() => SettingsStore.getWallet(accountId), [accountId, wallets]);
 
-  // Guard: wallet not found
-  if (!wallet) {
-    return (
-      <View style={[styles.errorContainer, { backgroundColor: Theme['bg-100'] }]}>
-        <Text style={[styles.errorTitle, { color: Theme['fg-100'] }]}>
-          Account Not Found
-        </Text>
-        <Text style={[styles.errorDescription, { color: Theme['fg-150'] }]}>
-          This account may have been deleted or does not exist.
-        </Text>
-        <TouchableOpacity
-          style={[styles.errorButton, { backgroundColor: Theme['accent-100'] }]}
-          onPress={() => navigation.goBack()}>
-          <Text style={[styles.errorButtonText, { color: Theme['inverse-100'] }]}>
-            Go Back
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // Extract wallet info and type (must be called before any conditional returns)
+  const walletInfo = useMemo(() => wallet?.getWalletInfo(), [wallet]);
 
-  const walletInfo = wallet.getWalletInfo();
-  const isHardware = wallet.type === WalletType.SATOCHIP;
+  const isHardware = useMemo(() => wallet?.type === WalletType.SATOCHIP, [wallet]);
 
   // Filter and sort balances for this wallet address
   const addressBalances = useMemo(() => {
+    if (!walletInfo) return [];  // Guard for undefined wallet
+
     const walletAddress = walletInfo.address;
     const allBalances: BalanceEntry[] = [];
 
@@ -90,7 +73,7 @@ export default function AccountDetail({ route, navigation }: Props) {
       if (b.usdValue !== undefined) return 1;
       return a.chainName.localeCompare(b.chainName);
     });
-  }, [walletInfo.address, balances]);
+  }, [walletInfo, balances]);
 
   // Get the best chainId for SendTransaction navigation
   const getDefaultChainId = useCallback((): number => {
@@ -107,6 +90,27 @@ export default function AccountDetail({ route, navigation }: Props) {
     // Strategy 3: Fallback to Ethereum mainnet
     return 1;
   }, [addressBalances]);
+
+  // Guard: wallet not found
+  if (!wallet || !walletInfo) {
+    return (
+      <View style={[styles.errorContainer, { backgroundColor: Theme['bg-100'] }]}>
+        <Text style={[styles.errorTitle, { color: Theme['fg-100'] }]}>
+          Account Not Found
+        </Text>
+        <Text style={[styles.errorDescription, { color: Theme['fg-150'] }]}>
+          This account may have been deleted or does not exist.
+        </Text>
+        <TouchableOpacity
+          style={[styles.errorButton, { backgroundColor: Theme['accent-100'] }]}
+          onPress={() => navigation.goBack()}>
+          <Text style={[styles.errorButtonText, { color: Theme['inverse-100'] }]}>
+            Go Back
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   // Handlers
   const copyToClipboard = (value: string, label: string) => {
