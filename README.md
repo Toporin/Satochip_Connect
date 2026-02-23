@@ -141,6 +141,11 @@ yarn android:bundle
 ```
 Bundle will be signed using the keystore info provided in ./android/secrets.properties.
 
+Check .aab bundle signature:
+```bash
+keytool -printcert -jarfile app-release.aab
+```
+
 ## Acknowledgement
 
 This application is based on the [RNWeb3Wallet](https://github.com/reown-com/react-native-examples/tree/main/wallets/rn_cli_wallet).

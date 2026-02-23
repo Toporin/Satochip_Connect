@@ -18,23 +18,23 @@ import SettingsStore from '@/store/SettingsStore';
 import ModalStore from '@/store/ModalStore';
 
 Sentry.init({
-  enabled: !__DEV__ && !!Config.ENV_SENTRY_DSN,
+  enabled: false,
   dsn: Config.ENV_SENTRY_DSN,
   environment: Config.ENV_SENTRY_TAG,
-  sendDefaultPii: true,
+  sendDefaultPii: false,
   // Enable Logs
-  enableLogs: true,
+  enableLogs: false,
 
   // Temporarily disable native for Android & iOS, not sure why it's not working
   enableNative: false,
 
   // Configure Session Replay
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1,
+  replaysSessionSampleRate: 0,
+  replaysOnErrorSampleRate: 0,
 
-  tracesSampleRate: 0.5,
-  profilesSampleRate: 1.0,
-  integrations: [Sentry.mobileReplayIntegration()],
+  tracesSampleRate: 0,
+  profilesSampleRate: 0,
+  integrations: [],
 
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   // spotlight: __DEV__,
