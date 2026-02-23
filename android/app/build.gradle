@@ -109,13 +109,13 @@ android {
         internal {
             storeFile file(secretsProperties['WC_FILENAME_INTERNAL'])
             storePassword secretsProperties['WC_STORE_PASSWORD_INTERNAL']
-            keyAlias secretsProperties['WC_KEYSTORE_ALIAS']
+            keyAlias secretsProperties['WC_KEYSTORE_ALIAS_INTERNAL']
             keyPassword secretsProperties['WC_KEY_PASSWORD_INTERNAL']
         }
         upload {
             storeFile file(secretsProperties['WC_FILENAME_UPLOAD'])
             storePassword secretsProperties['WC_STORE_PASSWORD_UPLOAD']
-            keyAlias secretsProperties['WC_KEYSTORE_ALIAS']
+            keyAlias secretsProperties['WC_KEYSTORE_ALIAS_UPLOAD']
             keyPassword secretsProperties['WC_KEY_PASSWORD_UPLOAD']
         }
     }

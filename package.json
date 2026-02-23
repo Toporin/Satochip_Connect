@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "android": "yarn run copy:debug && react-native run-android --mode=debug --appId io.satochip.walletconnect.debug",
+    "android:build:debug": "yarn run copy:debug && mkdir -p android/app/src/main/assets && npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res && cd android && ./gradlew clean && ./gradlew assembleDebug",
     "android:build": "yarn run copy:production && cd android && ./gradlew clean && ./gradlew assembleRelease",
     "android:build:internal": "yarn run copy:internal && cd android && ./gradlew clean && ./gradlew assembleInternal",
-    "build-android-debug": "mkdir -p android/app/src/main/assets && npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res && cd android && ./gradlew assembleDebug",
+    "android:bundle": "yarn run copy:production && cd android && ./gradlew clean && ./gradlew bundleRelease -x uploadSentryNativeSymbolsForRelease",
+    "android:bundle:internal": "yarn run copy:internal && cd android && ./gradlew clean && ./gradlew bundleInternal -x uploadSentryNativeSymbolsForRelease",
     "ios": "react-native run-ios --scheme 'RNWallet-Debug'",
     "ios:internal": "react-native run-ios --scheme 'RNWallet-Internal'",
     "bundle:ios": "react-native bundle --entry-file='index.js' --bundle-output='./ios/main.jsbundle' --dev=false --platform='ios'",

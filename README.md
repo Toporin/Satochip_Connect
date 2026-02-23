@@ -122,27 +122,24 @@ This is one way to run your app — you can also run it directly from within And
 
 #### Update app version
 
-For Android, update app version in `./android/app/build.gradle` using semantic versioning: versionName & versionCode.
-
-For iOS, update app version in ./ios/RNWeb3Wallet.xcodeproj: MARKETING_VERSION & CURRENT_PROJECT_VERSION:
-Using a script on MacOS:
+Use script to update semantic version for both android and iOS, for example:
 ```bash
-sed -i '' 's/MARKETING_VERSION = .*/MARKETING_VERSION = 0.1.0;/' ios/RNWeb3Wallet.xcodeproj/project.pbxproj
-sed -i '' 's/CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = 100;/' ios/RNWeb3Wallet.xcodeproj/project.pbxproj
-```
-On linux, use:
-```bash
-sed -i 's/MARKETING_VERSION = .*/MARKETING_VERSION = 0.1.0;/' ios/RNWeb3Wallet.xcodeproj/project.pbxproj
-sed -i 's/CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = 100;/' ios/RNWeb3Wallet.xcodeproj/project.pbxproj
+./update_version.sh 0.1.2
 ```
 
-#### Build debug APK: 
+#### Build android debug APK: 
 ```bash
-yarn build-android-debug
-cd android
-./gradlew clean
-./gradlew assembleDebug
+yarn android:build:debug
 ```
+
+#### Build android AAB Bundle:
+
+(Check that CHANGELOG & version have been updated following semantic versioning)
+
+```bash
+yarn android:bundle
+```
+Bundle will be signed using the keystore info provided in ./android/secrets.properties.
 
 ## Acknowledgement
 
