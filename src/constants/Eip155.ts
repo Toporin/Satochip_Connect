@@ -245,7 +245,6 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
   // Ethereum Mainnet
   1: [
     'https://eth.llamarpc.com',
-    'https://rpc.ankr.com/eth',
     'https://1rpc.io/eth',
     'https://ethereum.publicnode.com',
     'https://cloudflare-eth.com',
@@ -255,15 +254,12 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
   11155111: [
     'https://0xrpc.io/sep',
     'https://ethereum-sepolia-rpc.publicnode.com',
-    'https://rpc.ankr.com/eth_sepolia',
     'https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161', // Public Infura endpoint
     'https://1rpc.io/sepolia',
   ],
 
   // Polygon Mainnet
   137: [
-    'https://polygon-rpc.com',
-    'https://rpc.ankr.com/polygon',
     'https://1rpc.io/matic',
     'https://polygon.llamarpc.com',
   ],
@@ -281,7 +277,6 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
     'https://bsc-dataseed.binance.org',
     'https://bsc-dataseed1.binance.org',
     'https://bsc-dataseed2.binance.org',
-    'https://rpc.ankr.com/bsc',
     'https://1rpc.io/bnb',
   ],
 
@@ -294,7 +289,6 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
   // Arbitrum One
   42161: [
     'https://arb1.arbitrum.io/rpc',
-    'https://rpc.ankr.com/arbitrum',
     'https://1rpc.io/arb',
   ],
 
@@ -308,7 +302,6 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
   // Optimism Mainnet
   10: [
     'https://mainnet.optimism.io',
-    'https://rpc.ankr.com/optimism',
     'https://1rpc.io/op',
   ],
 
@@ -323,14 +316,12 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
   // Avalanche C-Chain
   43114: [
     'https://api.avax.network/ext/bc/C/rpc',
-    'https://rpc.ankr.com/avalanche',
     '1rpc.io/avax/c',
   ],
 
   // Avalanche Fuji Testnet
   43113: [
     'https://api.avax-test.network/ext/bc/C/rpc',
-    'https://rpc.ankr.com/avalanche_fuji',
   ],
 
   // Fantom Mainnet
@@ -360,7 +351,6 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
   // Gnosis Chain (xDai)
   100: [
     'https://rpc.gnosischain.com',
-    'https://rpc.ankr.com/gnosis',
   ],
 
   // zkSync Era Mainnet
@@ -372,21 +362,18 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
   // Polygon zkEVM
   1101: [
     'https://zkevm-rpc.com',
-    'https://rpc.ankr.com/polygon_zkevm',
     'https://1rpc.io/polygon/zkevm',
   ],
 
   // Celo Mainnet
   42220: [
     'https://forno.celo.org',
-    'https://rpc.ankr.com/celo',
     'https://1rpc.io/celo',
   ],
 
   // Harmony Mainnet
   1666600000: [
     'https://api.harmony.one',
-    'https://rpc.ankr.com/harmony',
     'https://1rpc.io/one',
   ],
 };
