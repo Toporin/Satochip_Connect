@@ -20,7 +20,7 @@ import {
   getEIP155AddressesFromParams,
   getSignParamsMessage,
   getSignTypedDataParamsData,
-  validateTransactionAddresses,
+  validateTransaction,
 } from '@/utils/HelperUtil';
 import { EIP155_SIGNING_METHODS } from '@/constants/Eip155';
 import SettingsStore from '@/store/SettingsStore.ts';
@@ -106,7 +106,7 @@ export async function approveEIP155RequestEnhanced(
             message,
           );
         }
-
+        console.info(`Signed message for address: ${address}`);
         return formatJsonRpcResult(id, signedMessage);
       }
 
@@ -140,16 +140,17 @@ export async function approveEIP155RequestEnhanced(
             data,
           );
         }
-
+        console.info(`Signed Typed Data for address: ${address}`);
         return formatJsonRpcResult(id, signedData);
       }
 
       case EIP155_SIGNING_METHODS.ETH_SEND_TRANSACTION:
       case EIP155_SIGNING_METHODS.ETH_SIGN_TRANSACTION: {
         const transaction = request.params[0];
+        console.log('approveEIP155RequestEnhanced unsignedTx:', transaction);
 
-        // Validate transaction addresses
-        const validatedTransaction = validateTransactionAddresses(transaction);
+        // Validate transaction
+        let validatedTransaction = await validateTransaction(transaction, chainId);
 
         let signedTx;
         if (wallet.type === WalletType.SATOCHIP) {
@@ -169,15 +170,17 @@ export async function approveEIP155RequestEnhanced(
             validatedTransaction,
           );
         }
+        console.log('approveEIP155RequestEnhanced signedTx:', signedTx);
 
         // Return signedTx or txHash based on method type
         if (request.method === EIP155_SIGNING_METHODS.ETH_SEND_TRANSACTION) {
           // Broadcast and return transaction hash
           const txHash = await broadcastTransaction(signedTx, chainId);
-          console.log('approveEIP155RequestEnhanced txHash:', txHash);
+          console.info(`Broadcast transaction with hash ${txHash} for address: ${address}`);
           return formatJsonRpcResult(id, txHash);
         } else {
           // Return signed transaction for eth_signTransaction
+          console.info(`Signed transaction for address: ${address}`);
           return formatJsonRpcResult(id, signedTx);
         }
       }

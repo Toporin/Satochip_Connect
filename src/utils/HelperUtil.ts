@@ -2,6 +2,7 @@ import {utils} from 'ethers';
 import {ProposalTypes} from '@walletconnect/types';
 import {PresetsUtil} from './PresetsUtil';
 import {WalletError, WalletErrorType} from '@/types/WalletTypes';
+import TransactionService from '@/services/TransactionService.ts';
 
 /**
  * Truncates string (in the middle) via given length value
@@ -101,12 +102,16 @@ export function validateAndNormalizeAddress(address: any): string {
 }
 
 /**
- * Validates transaction object addresses (from and to)
+ * Validates transaction object
  * @param transaction - The transaction object
- * @returns Transaction with normalized addresses
- * @throws WalletError if addresses are invalid
+ * @param chainId
+ * @returns Transaction - validated and complete
+ * @throws WalletError if transaction or from address is invalid
  */
-export function validateTransactionAddresses(transaction: any): any {
+export async function validateTransaction(
+  transaction: any,
+  chainId: number,
+): Promise<any> {
   if (!transaction || typeof transaction !== 'object') {
     throw new WalletError(
       WalletErrorType.INVALID_ADDRESS,
@@ -129,11 +134,74 @@ export function validateTransactionAddresses(transaction: any): any {
     normalizedTo = validateAndNormalizeAddress(transaction.to);
   }
 
-  // Return transaction with normalized addresses
+  // validate nonce
+  let nonce = transaction.nonce;
+  if (!nonce) {
+    nonce = await TransactionService.fetchNonce(normalizedFrom, chainId);
+    console.log(`[HelperUtil] validateTransaction fetched missing nonce: ${nonce}`);
+  }
+
+  // validate gasLimit
+  let gas = transaction.gas;
+  if (!gas){
+    gas = await TransactionService.estimateGas(
+      normalizedFrom,
+      normalizedTo,
+      transaction.value,
+      transaction.data || '0x',
+      chainId
+    );
+    console.log(`[HelperUtil] validateTransaction estimated missing gas: ${gas}`);
+  }
+
+  // validate gas fee (legacy or EIP-1559
+  if (!transaction.gasPrice && !(transaction.maxFeePerGas && transaction.maxPriorityFeePerGas)) {
+    const gasPriceResult = await TransactionService.fetchGasPrice(chainId);
+    if (gasPriceResult.maxFeePerGas && gasPriceResult.maxPriorityFeePerGas) {
+      let maxFeePerGas = transaction.maxFeePerGas;
+      if (!maxFeePerGas){
+        maxFeePerGas = gasPriceResult.maxFeePerGas;
+        console.log(`[HelperUtil] validateTransaction estimated missing maxFeePerGas: ${maxFeePerGas}`);
+      }
+      let maxPriorityFeePerGas = transaction.maxPriorityFeePerGas;
+      if (!maxPriorityFeePerGas){
+        maxPriorityFeePerGas = gasPriceResult.maxPriorityFeePerGas;
+        console.log(`[HelperUtil] validateTransaction estimated missing maxPriorityFeePerGas: ${maxPriorityFeePerGas}`);
+      }
+      return {
+        ...transaction,
+        from: normalizedFrom,
+        to: normalizedTo,
+        nonce: nonce,
+        gas: gas,
+        maxFeePerGas: maxFeePerGas,
+        maxPriorityFeePerGas: maxPriorityFeePerGas
+      };
+    } else if (gasPriceResult.legacy) {
+      console.log(`[HelperUtil] validateTransaction estimated missing gasPrice: ${gasPriceResult.legacy}`);
+      return {
+        ...transaction,
+        from: normalizedFrom,
+        to: normalizedTo,
+        nonce: nonce,
+        gas: gas,
+        gasPrice: gasPriceResult.legacy,
+      }
+    }else {
+      throw new WalletError(
+        WalletErrorType.INVALID_GAS_FEE,
+        'Transaction missing gas info',
+      )
+    }
+  }
+
+  // Return transaction with nonce
   return {
     ...transaction,
     from: normalizedFrom,
     to: normalizedTo,
+    nonce: nonce,
+    gas: gas,
   };
 }
 
@@ -168,9 +236,14 @@ export function getEIP155AddressesFromParams(params: any): string {
       case "eth_signTransaction":
       case "eth_sendTransaction": {
         const transaction = params.request.params[0];
+        if (!transaction || typeof transaction !== 'object') {
+          throw new WalletError(
+            WalletErrorType.INVALID_ADDRESS,
+            'Transaction must be an object',
+          );
+        }
         // Validate transaction addresses
-        const validatedTx = validateTransactionAddresses(transaction);
-        return validatedTx.from; // Return normalized 'from' address
+        return validateAndNormalizeAddress(transaction.from); // Return normalized 'from' address
       }
 
       default:

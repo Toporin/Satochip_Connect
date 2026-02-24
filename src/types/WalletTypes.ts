@@ -96,6 +96,7 @@ export enum WalletErrorType {
   COMMUNICATION_ERROR = 'COMMUNICATION_ERROR',
   WALLET_NOT_SET = 'WALLET_NOT_SET',
   INVALID_ADDRESS = 'INVALID_ADDRESS',
+  INVALID_GAS_FEE = 'INVALID_GAS_FEE',
 }
 
 export class WalletError extends Error {

@@ -385,11 +385,16 @@ export async function tryMultipleRpcEndpoints(
       console.log(`Trying RPC endpoint: ${rpcUrl}`);
       const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
 
-      // Set a timeout for the provider
-      provider.connection.timeout = 10000; // 10 seconds
+      // Set 10-second timeout
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('RPC request timeout')), 10000);
+      });
 
-      const txResponse = await provider.sendTransaction(signedTx);
-      console.log(`Successfully broadcast transaction via ${rpcUrl}`);
+      const txResponsePromise = provider.sendTransaction(signedTx);
+
+      const txResponse = await Promise.race([txResponsePromise, timeoutPromise]);
+
+      console.log(`Transaction with hash ${txResponse.hash} broadcast successfully`);
       return txResponse.hash;
     } catch (error: any) {
       console.warn(`Failed to broadcast via ${rpcUrl}:`, error.message);
