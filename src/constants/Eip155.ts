@@ -20,7 +20,9 @@ import Aurora from '@/assets/chains/aurora.webp';
 import Unknown from '@/assets/chains/unknown.png';
 import { Chain } from '@/utils/TypesUtil';
 import { ImageSourcePropType } from 'react-native';
+import Config from 'react-native-config';
 
+const ALCHEMY_API_KEY = Config.ENV_ALCHEMY_API_KEY
 
 // Helpers
 export const EIP155_CHAINS: Record<string, Chain> = {
@@ -244,6 +246,7 @@ export const EIP155_SIGNING_METHODS = {
 export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
   // Ethereum Mainnet
   1: [
+    'https://eth-mainnet.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://eth.llamarpc.com',
     'https://1rpc.io/eth',
     'https://ethereum.publicnode.com',
@@ -252,6 +255,7 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
 
   // Ethereum Sepolia Testnet
   11155111: [
+    'https://eth-sepolia.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://0xrpc.io/sep',
     'https://ethereum-sepolia-rpc.publicnode.com',
     'https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161', // Public Infura endpoint
@@ -260,12 +264,14 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
 
   // Polygon Mainnet
   137: [
+    'https://polygon-mainnet.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://1rpc.io/matic',
     'https://polygon.llamarpc.com',
   ],
 
   // Polygon Amoy Testnet
   80002: [
+    'https://polygon-amoy.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://rpc-amoy.polygon.technology',
     'https://polygon-amoy.drpc.org',
     'https://polygon-amoy-public.nodies.app',
@@ -274,6 +280,7 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
 
   // BSC Mainnet
   56: [
+    'https://bnb-mainnet.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://bsc-dataseed.binance.org',
     'https://bsc-dataseed1.binance.org',
     'https://bsc-dataseed2.binance.org',
@@ -282,18 +289,21 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
 
   // BSC Testnet
   97: [
+    'https://bnb-testnet.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://data-seed-prebsc-1-s1.binance.org:8545',
     'https://data-seed-prebsc-2-s1.binance.org:8545',
   ],
 
   // Arbitrum One
   42161: [
+    'https://arb-mainnet.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://arb1.arbitrum.io/rpc',
     'https://1rpc.io/arb',
   ],
 
   // Arbitrum Sepolia
   421614: [
+    'https://arb-sepolia.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://arbitrum-sepolia.drpc.org',
     'https://endpoints.omniatech.io/v1/arbitrum/sepolia/public',
     'https://arbitrum-sepolia-testnet.api.pocket.network',
@@ -301,12 +311,14 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
 
   // Optimism Mainnet
   10: [
+    'https://opt-mainnet.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://mainnet.optimism.io',
     'https://1rpc.io/op',
   ],
 
   // Optimism Sepolia
   11155420: [
+    'https://opt-sepolia.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://sepolia.optimism.io',
     'https://endpoints.omniatech.io/v1/op/sepolia/public',
     'https://optimism-sepolia.drpc.org',
@@ -315,17 +327,20 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
 
   // Avalanche C-Chain
   43114: [
+    'https://avax-mainnet.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://api.avax.network/ext/bc/C/rpc',
     '1rpc.io/avax/c',
   ],
 
   // Avalanche Fuji Testnet
   43113: [
+    'https://avax-fuji.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://api.avax-test.network/ext/bc/C/rpc',
   ],
 
   // Fantom Mainnet
   250: [
+    // No Alchemy support
     'https://rpc.fantom.network',
     'https://rpc2.fantom.network',
     'https://fantom-public.nodies.app',
@@ -335,6 +350,7 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
 
   // Base Mainnet
   8453: [
+    'https://base-mainnet.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://mainnet.base.org',
     'https://base.llamarpc.com',
     '1rpc.io/base',
@@ -342,6 +358,7 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
 
   // Base Sepolia
   84532: [
+    'https://base-sepolia.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://sepolia.base.org',
     'https://base-sepolia.drpc.org',
     'https://base-sepolia-public.nodies.app',
@@ -350,29 +367,34 @@ export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
 
   // Gnosis Chain (xDai)
   100: [
+    'https://gnosis-mainnet.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://rpc.gnosischain.com',
   ],
 
   // zkSync Era Mainnet
   324: [
+    'https://zksync-mainnet.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://mainnet.era.zksync.io',
     '1rpc.io/zksync2-era',
   ],
 
   // Polygon zkEVM
   1101: [
+    'https://polygonzkevm-mainnet.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://zkevm-rpc.com',
     'https://1rpc.io/polygon/zkevm',
   ],
 
   // Celo Mainnet
   42220: [
+    'https://celo-mainnet.g.alchemy.com/v2/'+ALCHEMY_API_KEY,
     'https://forno.celo.org',
     'https://1rpc.io/celo',
   ],
 
   // Harmony Mainnet
   1666600000: [
+    // No Alchemy support
     'https://api.harmony.one',
     'https://1rpc.io/one',
   ],

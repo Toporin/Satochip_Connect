@@ -14,6 +14,7 @@ declare module 'react-native-config' {
     ENV_RELAY_URL: string;
     ENV_SENTRY_DSN: string;
     ENV_SENTRY_TAG: string;
+    ENV_ALCHEMY_API_KEY: string;
   }
 
   export const Config: NativeConfig;
