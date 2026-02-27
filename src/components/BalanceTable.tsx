@@ -12,34 +12,20 @@ import type { TokenBalanceEntry } from '@/services/TokenService';
 
 interface BalanceTableProps {
   addressBalances: BalanceEntry[];
-  addressTokenBalances?: TokenBalanceEntry[];
+  addressTokenBalances: Map<number, TokenBalanceEntry[]>;
 }
 
 export default function BalanceTable({ addressBalances, addressTokenBalances }: BalanceTableProps) {
   const Theme = useTheme();
   const { balancesLoading, balancesError, tokenBalancesLoading } = useSnapshot(SettingsStore.state);
 
-  // todo: make addressTokenBalances as Map<number, TokenBalanceEntry[]> for efficiency?
-  const tokens = addressTokenBalances || [];
-
-  // Group tokens by chainId
-  const tokensByChain = React.useMemo(() => {
-    const map = new Map<number, TokenBalanceEntry[]>();
-    for (const token of tokens) {
-      const arr = map.get(token.chainId) || [];
-      arr.push(token);
-      map.set(token.chainId, arr);
-    }
-    return map;
-  }, [tokens]);
-
   // Build merged chain list: union of native balance chains + token chains
   const mergedChainIds = React.useMemo(() => {
     const nativeChainIds = addressBalances.map(e => e.chainId);
-    const tokenChainIds = Array.from(tokensByChain.keys());
+    const tokenChainIds = Array.from(addressTokenBalances.keys());
     const all = new Set([...nativeChainIds, ...tokenChainIds]);
     return Array.from(all);
-  }, [addressBalances, tokensByChain]);
+  }, [addressBalances, addressTokenBalances]);
 
   // Build native entry lookup
   const nativeByChain = React.useMemo(() => {
@@ -53,9 +39,14 @@ export default function BalanceTable({ addressBalances, addressTokenBalances }: 
   // Calculate total portfolio value (native + tokens)
   const totalValue = React.useMemo(() => {
     const nativeTotal = addressBalances.reduce((sum, e) => sum + (e.usdValue || 0), 0);
-    const tokenTotal = tokens.reduce((sum, e) => sum + (e.usdValue || 0), 0);
+    let tokenTotal = 0;
+    for (const entries of addressTokenBalances.values()) {
+      for (const entry of entries) {
+        tokenTotal += entry.usdValue ?? 0;
+      }
+    }
     return nativeTotal + tokenTotal;
-  }, [addressBalances, tokens]);
+  }, [addressBalances, addressTokenBalances]);
 
   const isLoading = balancesLoading || tokenBalancesLoading;
   const hasContent = mergedChainIds.length > 0;
@@ -125,7 +116,7 @@ export default function BalanceTable({ addressBalances, addressTokenBalances }: 
           const chainKey = `eip155:${chainId}`;
           const chainImage = EIP155_NETWORK_IMAGES[chainKey];
           const nativeEntry = nativeByChain.get(chainId);
-          const chainTokens = tokensByChain.get(chainId) || [];
+          const chainTokens = addressTokenBalances.get(chainId) || [];
           const isLastChain = chainIdx === mergedChainIds.length - 1;
 
           return (

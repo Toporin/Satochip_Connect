@@ -50,27 +50,37 @@ export default function AccountDetail({ route, navigation }: Props) {
 
   const isHardware = useMemo(() => wallet?.type === WalletType.SATOCHIP, [wallet]);
 
-  // Filter token balances for this wallet address (non-zero, no error)
-  const addressTokenBalances = useMemo((): TokenBalanceEntry[] => {
-    if (!walletInfo) return [];
+  // Filter token balances for this wallet address, by chainId (non-zero, no error)
+  const addressTokenBalances = useMemo((): Map<number, TokenBalanceEntry[]> => {
+    if (!walletInfo) return new Map();
     const walletAddress = walletInfo.address;
-    const result: TokenBalanceEntry[] = [];
+    const result = new Map<number, TokenBalanceEntry[]>();
+
     for (const [key, entry] of Object.entries(tokenBalances)) {
       if (key.startsWith(`${walletAddress}:`) && entry.balance !== '0' && !entry.error) {
-        result.push(entry as TokenBalanceEntry);
+        const chainId = (entry as TokenBalanceEntry).chainId;
+        const bucket = result.get(chainId);
+        if (bucket) {
+          bucket.push(entry as TokenBalanceEntry);
+        } else {
+          result.set(chainId, [entry as TokenBalanceEntry]);
+        }
       }
     }
 
-    // Sort by USD value (highest first), then by name
-    //return result;
-    return result.sort((a, b) => {
-      if (a.usdValue !== undefined && b.usdValue !== undefined) {
-        return b.usdValue - a.usdValue;
-      }
-      if (a.usdValue !== undefined) return -1;
-      if (b.usdValue !== undefined) return 1;
-      return a.name.localeCompare(b.name);
-    });
+    // Sort each chain's entries by USD value (highest first), then by name
+    for (const [chainId, entries] of result) {
+      result.set(chainId, entries.sort((a, b) => {
+        if (a.usdValue !== undefined && b.usdValue !== undefined) {
+          return b.usdValue - a.usdValue;
+        }
+        if (a.usdValue !== undefined) return -1;
+        if (b.usdValue !== undefined) return 1;
+        return a.name.localeCompare(b.name);
+      }));
+    }
+
+    return result;
   }, [walletInfo, tokenBalances]);
 
   // Filter and sort native balances for this wallet address.
