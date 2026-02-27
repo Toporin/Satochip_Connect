@@ -36,6 +36,7 @@
     "@reown/appkit-ui-react-native": "1.0.1",
     "@reown/walletkit": "1.4.1",
     "@sentry/react-native": "7.3.0",
+    "@uniswap/default-token-list": "^18.6.0",
     "@walletconnect/react-native-compat": "2.23.0",
     "bip39": "3.1.0",
     "buffer": "^4.9.1",

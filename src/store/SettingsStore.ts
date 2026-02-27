@@ -14,6 +14,7 @@ import {
 import { SatochipWallet } from '@/wallets/satochip/SatochipWallet';
 import { EIP155SoftwareWallet } from '@/wallets/EIP155SoftwareWallet';
 import type { BalanceEntry } from '@/services/BalanceService';
+import type { TokenBalanceEntry } from '@/services/TokenService';
 
 /**
  * Types
@@ -41,6 +42,12 @@ interface State {
   balancesLoading: boolean;
   balancesError: string | null;
   lastBalanceFetch: number | null; // Timestamp for deduplication
+
+  // Token balance management (in-memory only, no persistence)
+  tokenBalances: Record<string, TokenBalanceEntry>; // Key format: "address:chainId:contract"
+  tokenBalancesLoading: boolean;
+  tokenBalancesError: string | null;
+  lastTokenBalanceFetch: number | null; // Timestamp for deduplication
 }
 
 /**
@@ -63,6 +70,12 @@ const state = proxy<State>({
   balancesLoading: false,
   balancesError: null,
   lastBalanceFetch: null,
+
+  // Token balance management
+  tokenBalances: {},
+  tokenBalancesLoading: false,
+  tokenBalancesError: null,
+  lastTokenBalanceFetch: null,
 });
 
 /**
@@ -430,7 +443,62 @@ const SettingsStore = {
     const now = Date.now();
     const thirtySeconds = 30 * 1000;
     return now - state.lastBalanceFetch < thirtySeconds;
-  }
+  },
+
+  // ============================================
+  // Token Balance Management Methods
+  // ============================================
+
+  setTokenBalancesLoading(loading: boolean) {
+    state.tokenBalancesLoading = loading;
+  },
+
+  setTokenBalancesError(error: string | null) {
+    state.tokenBalancesError = error;
+  },
+
+  updateTokenBalances(balances: Record<string, TokenBalanceEntry>) {
+    state.tokenBalances = {
+      ...state.tokenBalances,
+      ...balances,
+    };
+  },
+
+  getTokenBalancesForAddress(address: string): TokenBalanceEntry[] {
+    const result: TokenBalanceEntry[] = [];
+    for (const [key, entry] of Object.entries(state.tokenBalances)) {
+      if (key.startsWith(`${address}:`)) {
+        result.push(entry);
+      }
+    }
+    return result;
+  },
+
+  getNonZeroTokenBalancesForAddress(address: string): TokenBalanceEntry[] {
+    return this.getTokenBalancesForAddress(address).filter(
+      entry => entry.balance !== '0' && !entry.error
+    );
+  },
+
+  clearTokenBalances() {
+    state.tokenBalances = {};
+    state.tokenBalancesLoading = false;
+    state.tokenBalancesError = null;
+    state.lastTokenBalanceFetch = null;
+  },
+
+  setLastTokenBalanceFetch(timestamp: number) {
+    state.lastTokenBalanceFetch = timestamp;
+  },
+
+  wereTokenBalancesFetchedRecently(): boolean {
+    if (!state.lastTokenBalanceFetch) {
+      return false;
+    }
+    const now = Date.now();
+    const thirtySeconds = 30 * 1000;
+    return now - state.lastTokenBalanceFetch < thirtySeconds;
+  },
 };
 
 export default SettingsStore;

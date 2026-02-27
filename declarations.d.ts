@@ -1,3 +1,19 @@
+declare module '@uniswap/default-token-list' {
+  interface UniswapToken {
+    chainId: number;
+    address: string;
+    name: string;
+    symbol: string;
+    decimals: number;
+    logoURI: string;
+  }
+  interface TokenList {
+    tokens: UniswapToken[];
+  }
+  const tokenList: TokenList;
+  export = tokenList;
+}
+
 declare module '*.png';
 declare module '*.webp';
 

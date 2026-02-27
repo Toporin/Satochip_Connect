@@ -13,6 +13,7 @@ import {RootStackNavigator} from '@/navigators/RootStackNavigator';
 import useInitializeWalletKit from '@/hooks/useInitializeWalletKit';
 import useWalletKitEventsManager from '@/hooks/useWalletKitEventsManager';
 import { useBalanceFetching } from '@/hooks/useBalanceFetching';
+import { useTokenBalanceFetching } from '@/hooks/useTokenBalanceFetching';
 import {walletKit} from '@/utils/WalletKitUtil';
 import SettingsStore from '@/store/SettingsStore';
 import ModalStore from '@/store/ModalStore';
@@ -55,6 +56,9 @@ const App = () => {
 
   // Step 3 - Set up balance fetching on app foreground
   useBalanceFetching();
+
+  // Step 4 - Set up token balance fetching on app foreground
+  useTokenBalanceFetching();
 
   useEffect(() => {
     if (initialized) {

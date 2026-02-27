@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   Text,
   View,
   ScrollView,
   TouchableOpacity,
   Linking,
-  Image,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import Toast from 'react-native-toast-message';
@@ -35,7 +34,7 @@ export default function AccountsScreen({ navigation }: Props) {
   const Theme = useTheme();
 
   // Subscribe to SettingsStore state changes
-  const { wallets, balances } = useSnapshot(SettingsStore.state);
+  const { wallets, balances, tokenBalances } = useSnapshot(SettingsStore.state);
   
   // Compute accounts directly from the reactive wallets state
   const accounts = React.useMemo((): AccountItem[] => {
@@ -72,14 +71,14 @@ export default function AccountsScreen({ navigation }: Props) {
     return accountsList;
   }, [wallets]); // Re-compute when wallets Map changes
 
-  // Calculate total USD balance for each account
+  // Calculate total USD balance for each account (native + tokens)
   const accountBalances = React.useMemo(() => {
     const result: Record<string, number> = {};
 
     accounts.forEach(account => {
       let total = 0;
+      // Sum native balances
       for (const [key, entry] of Object.entries(balances)) {
-        // Filter balances for this specific address
         if (key.startsWith(`${account.address}:`)) {
           if (entry.balance !== '0' &&
               !entry.error &&
@@ -88,11 +87,17 @@ export default function AccountsScreen({ navigation }: Props) {
           }
         }
       }
+      // Sum token balances
+      for (const [key, entry] of Object.entries(tokenBalances)) {
+        if (key.startsWith(`${account.address}:`) && !entry.error && entry.usdValue !== undefined) {
+          total += entry.usdValue;
+        }
+      }
       result[account.address] = total;
     });
 
     return result;
-  }, [accounts, balances]);
+  }, [accounts, balances, tokenBalances]);
 
   const copyToClipboard = (value: string, label: string) => {
     Clipboard.setString(value);

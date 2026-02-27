@@ -20,7 +20,10 @@ import { AccountsStackScreenProps } from '@/utils/TypesUtil';
 import { SatochipInfo, WalletType } from '@/types/WalletTypes';
 import BalanceTable from '@/components/BalanceTable';
 import { fetchBalancesForAllWallets } from '@/hooks/useBalanceFetching';
+import { fetchTokenBalancesForAllWallets } from '@/hooks/useTokenBalanceFetching';
 import { BalanceEntry } from '@/services/BalanceService';
+import type { TokenBalanceEntry } from '@/services/TokenService';
+import { EIP155_CHAINS } from '@/constants/Eip155';
 import styles from './styles';
 
 type Props = AccountsStackScreenProps<'AccountDetails'>;
@@ -36,7 +39,7 @@ export default function AccountDetail({ route, navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
 
   // Subscribe to store
-  const { wallets, balances } = useSnapshot(SettingsStore.state);
+  const { wallets, balances, tokenBalances } = useSnapshot(SettingsStore.state);
 
   // Get wallet
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -47,33 +50,91 @@ export default function AccountDetail({ route, navigation }: Props) {
 
   const isHardware = useMemo(() => wallet?.type === WalletType.SATOCHIP, [wallet]);
 
-  // Filter and sort balances for this wallet address
+  // Filter token balances for this wallet address (non-zero, no error)
+  const addressTokenBalances = useMemo((): TokenBalanceEntry[] => {
+    if (!walletInfo) return [];
+    const walletAddress = walletInfo.address;
+    const result: TokenBalanceEntry[] = [];
+    for (const [key, entry] of Object.entries(tokenBalances)) {
+      if (key.startsWith(`${walletAddress}:`) && entry.balance !== '0' && !entry.error) {
+        result.push(entry as TokenBalanceEntry);
+      }
+    }
+
+    // Sort by USD value (highest first), then by name
+    //return result;
+    return result.sort((a, b) => {
+      if (a.usdValue !== undefined && b.usdValue !== undefined) {
+        return b.usdValue - a.usdValue;
+      }
+      if (a.usdValue !== undefined) return -1;
+      if (b.usdValue !== undefined) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [walletInfo, tokenBalances]);
+
+  // Filter and sort native balances for this wallet address.
+  // Also includes zero-balance native entries for chains that have tokens.
   const addressBalances = useMemo(() => {
     if (!walletInfo) return [];  // Guard for undefined wallet
 
     const walletAddress = walletInfo.address;
     const allBalances: BalanceEntry[] = [];
+    const includedChainIds = new Set<number>();
 
-    // Filter balances for this address
+    // Add all non-zero native balances
     for (const [key, entry] of Object.entries(balances)) {
       if (key.startsWith(`${walletAddress}:`)) {
-        // Only include non-zero balances without errors
         if (entry.balance !== '0' && !entry.error) {
           allBalances.push(entry);
+          includedChainIds.add(entry.chainId);
         }
       }
     }
 
-    // Sort by USD value (highest first), then by chain name
+    // Add zero-balance native entries for chains that have tokens but no native balance shown
+    const tokenChainIds = new Set<number>();
+    for (const key of Object.keys(tokenBalances)) {
+      if (key.startsWith(`${walletAddress}:`)) {
+        const parts = key.split(':');
+        if (parts.length >= 2) {
+          tokenChainIds.add(Number(parts[1]));
+        }
+      }
+    }
+
+    for (const chainId of tokenChainIds) {
+      if (!includedChainIds.has(chainId)) {
+        const nativeKey = `${walletAddress}:${chainId}`;
+        const existing = (balances as Record<string, BalanceEntry>)[nativeKey];
+        if (existing) {
+          allBalances.push({ ...existing, error: undefined });
+        } else {
+          const chainKey = `eip155:${chainId}`;
+          const chainInfo = EIP155_CHAINS[chainKey];
+          allBalances.push({
+            balance: '0',
+            decimals: 18,
+            timestamp: Date.now(),
+            chainId,
+            chainName: chainInfo?.name || `Chain ${chainId}`,
+            symbol: chainInfo?.symbol || '',
+          });
+        }
+        includedChainIds.add(chainId);
+      }
+    }
+
+    // Sort by USD value (highest first), then by chainId (lowest first)
     return allBalances.sort((a, b) => {
       if (a.usdValue !== undefined && b.usdValue !== undefined) {
         return b.usdValue - a.usdValue;
       }
       if (a.usdValue !== undefined) return -1;
       if (b.usdValue !== undefined) return 1;
-      return a.chainName.localeCompare(b.chainName);
+      return a.chainId - b.chainId;
     });
-  }, [walletInfo, balances]);
+  }, [walletInfo, balances, tokenBalances]);
 
   // Get the best chainId for SendTransaction navigation
   const getDefaultChainId = useCallback((): number => {
@@ -151,7 +212,10 @@ export default function AccountDetail({ route, navigation }: Props) {
     setRefreshing(true);
     try {
       // todo: fetch only current wallet?
-      await fetchBalancesForAllWallets();
+      await Promise.all([
+        fetchBalancesForAllWallets(),
+        fetchTokenBalancesForAllWallets(),
+      ]);
     } catch (error) {
       console.error('Failed to refresh balances:', error);
       Toast.show({
@@ -260,7 +324,7 @@ export default function AccountDetail({ route, navigation }: Props) {
         </View>
 
         {/* Balance section */}
-        <BalanceTable addressBalances={addressBalances} />
+        <BalanceTable addressBalances={addressBalances} addressTokenBalances={addressTokenBalances} />
 
         {/* Action buttons row */}
         <View style={styles.buttonRow}>

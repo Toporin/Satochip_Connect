@@ -6,25 +6,62 @@ import { useTheme } from '@/hooks/useTheme';
 import SettingsStore from '@/store/SettingsStore';
 import { formatBalance, formatUSD } from '@/utils/formatters';
 import { EIP155_NETWORK_IMAGES } from '@/constants/Eip155';
+import Unknown from '@/assets/chains/unknown.png';
 import type { BalanceEntry } from '@/services/BalanceService';
+import type { TokenBalanceEntry } from '@/services/TokenService';
 
 interface BalanceTableProps {
   addressBalances: BalanceEntry[];
+  addressTokenBalances?: TokenBalanceEntry[];
 }
 
-export default function BalanceTable({ addressBalances }: BalanceTableProps) {
+export default function BalanceTable({ addressBalances, addressTokenBalances }: BalanceTableProps) {
   const Theme = useTheme();
-  const { balancesLoading, balancesError } = useSnapshot(SettingsStore.state);
+  const { balancesLoading, balancesError, tokenBalancesLoading } = useSnapshot(SettingsStore.state);
 
-  // Calculate total portfolio value
-  const totalValue = React.useMemo(() => {
-    return addressBalances.reduce((sum, entry) => {
-      return sum + (entry.usdValue || 0);
-    }, 0);
+  // todo: make addressTokenBalances as Map<number, TokenBalanceEntry[]> for efficiency?
+  const tokens = addressTokenBalances || [];
+
+  // Group tokens by chainId
+  const tokensByChain = React.useMemo(() => {
+    const map = new Map<number, TokenBalanceEntry[]>();
+    for (const token of tokens) {
+      const arr = map.get(token.chainId) || [];
+      arr.push(token);
+      map.set(token.chainId, arr);
+    }
+    return map;
+  }, [tokens]);
+
+  // Build merged chain list: union of native balance chains + token chains
+  const mergedChainIds = React.useMemo(() => {
+    const nativeChainIds = addressBalances.map(e => e.chainId);
+    const tokenChainIds = Array.from(tokensByChain.keys());
+    const all = new Set([...nativeChainIds, ...tokenChainIds]);
+    return Array.from(all);
+  }, [addressBalances, tokensByChain]);
+
+  // Build native entry lookup
+  const nativeByChain = React.useMemo(() => {
+    const map = new Map<number, BalanceEntry>();
+    for (const entry of addressBalances) {
+      map.set(entry.chainId, entry);
+    }
+    return map;
   }, [addressBalances]);
 
+  // Calculate total portfolio value (native + tokens)
+  const totalValue = React.useMemo(() => {
+    const nativeTotal = addressBalances.reduce((sum, e) => sum + (e.usdValue || 0), 0);
+    const tokenTotal = tokens.reduce((sum, e) => sum + (e.usdValue || 0), 0);
+    return nativeTotal + tokenTotal;
+  }, [addressBalances, tokens]);
+
+  const isLoading = balancesLoading || tokenBalancesLoading;
+  const hasContent = mergedChainIds.length > 0;
+
   // Render loading state
-  if (balancesLoading && addressBalances.length === 0) {
+  if (isLoading && !hasContent) {
     return (
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: Theme['fg-100'] }]}>Balances</Text>
@@ -39,7 +76,7 @@ export default function BalanceTable({ addressBalances }: BalanceTableProps) {
   }
 
   // Render error state
-  if (balancesError && addressBalances.length === 0) {
+  if (balancesError && !hasContent) {
     return (
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: Theme['fg-100'] }]}>Balances</Text>
@@ -53,7 +90,7 @@ export default function BalanceTable({ addressBalances }: BalanceTableProps) {
   }
 
   // Render empty state
-  if (addressBalances.length === 0) {
+  if (!hasContent) {
     return (
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: Theme['fg-100'] }]}>Balances</Text>
@@ -84,39 +121,75 @@ export default function BalanceTable({ addressBalances }: BalanceTableProps) {
       </View>
 
       <View style={[styles.balanceCard, { backgroundColor: Theme['bg-175'] }]}>
-        {addressBalances.map((entry, index) => {
-          const chainKey = `eip155:${entry.chainId}`;
+        {mergedChainIds.map((chainId, chainIdx) => {
+          const chainKey = `eip155:${chainId}`;
           const chainImage = EIP155_NETWORK_IMAGES[chainKey];
-          const isLast = index === addressBalances.length - 1;
+          const nativeEntry = nativeByChain.get(chainId);
+          const chainTokens = tokensByChain.get(chainId) || [];
+          const isLastChain = chainIdx === mergedChainIds.length - 1;
 
           return (
-            <View key={entry.chainId}>
+            <View key={chainId}>
+              {/* Native balance row */}
               <View style={styles.balanceRow}>
-                {/* Chain icon and name */}
                 <View style={styles.chainInfo}>
-                  {chainImage && (
+                  {chainImage ? (
                     <Image source={chainImage} style={styles.chainIcon} />
+                  ) : (
+                    <Image source={Unknown} style={styles.chainIcon} />
                   )}
                   <Text style={[styles.chainName, { color: Theme['fg-100'] }]}>
-                    {entry.chainName}
+                    {nativeEntry?.chainName || `Chain ${chainId}`}
                   </Text>
                 </View>
 
-                {/* Balance and USD value */}
                 <View style={styles.balanceInfo}>
-                  <Text style={[styles.balanceAmount, { color: Theme['fg-100'] }]}>
-                    {formatBalance(entry.balance, entry.decimals)} {entry.symbol}
-                  </Text>
-                  {entry.usdValue !== undefined && (
-                    <Text style={[styles.balanceUSD, { color: Theme['fg-150'] }]}>
-                      {formatUSD(entry.usdValue)}
-                    </Text>
+                  {nativeEntry ? (
+                    <>
+                      <Text style={[styles.balanceAmount, { color: Theme['fg-100'] }]}>
+                        {formatBalance(nativeEntry.balance, nativeEntry.decimals)} {nativeEntry.symbol}
+                      </Text>
+                      {nativeEntry.usdValue !== undefined && nativeEntry.usdValue > 0 && (
+                        <Text style={[styles.balanceUSD, { color: Theme['fg-150'] }]}>
+                          {formatUSD(nativeEntry.usdValue)}
+                        </Text>
+                      )}
+                    </>
+                  ) : (
+                    <Text style={[styles.balanceAmount, { color: Theme['fg-200'] }]}>—</Text>
                   )}
                 </View>
               </View>
 
-              {/* Divider (not shown for last item) */}
-              {!isLast && (
+              {/* Token rows for this chain */}
+              {chainTokens.map(token => (
+                <View key={token.contract} style={[styles.tokenRowContainer, { backgroundColor: Theme['bg-200'] }]}>
+                  <View style={styles.chainInfo}>
+                    {token.logoURI ? (
+                      <Image source={{ uri: token.logoURI }} style={styles.tokenIcon} />
+                    ) : (
+                      <Image source={Unknown} style={styles.tokenIcon} />
+                    )}
+                    <Text style={[styles.tokenName, { color: Theme['fg-100'] }]}>
+                      {token.name || token.symbol}
+                    </Text>
+                  </View>
+
+                  <View style={styles.balanceInfo}>
+                    <Text style={[styles.tokenAmount, { color: Theme['fg-100'] }]}>
+                      {formatBalance(token.balance, token.decimals)} {token.symbol}
+                    </Text>
+                    {token.usdValue !== undefined && (
+                      <Text style={[styles.balanceUSD, { color: Theme['fg-150'] }]}>
+                        {formatUSD(token.usdValue)}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+
+              {/* Chain divider */}
+              {!isLastChain && (
                 <View style={[styles.rowDivider, { backgroundColor: Theme['bg-250'] }]} />
               )}
             </View>
@@ -125,7 +198,7 @@ export default function BalanceTable({ addressBalances }: BalanceTableProps) {
       </View>
 
       {/* Loading indicator for refresh */}
-      {balancesLoading && (
+      {isLoading && (
         <View style={styles.refreshingContainer}>
           <ActivityIndicator size="small" color={Theme['accent-100']} />
           <Text style={[styles.refreshingText, { color: Theme['fg-150'] }]}>
@@ -197,6 +270,31 @@ const styles = StyleSheet.create({
   balanceUSD: {
     fontSize: 13,
     fontWeight: '400',
+  },
+  tokenRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    paddingLeft: 12,
+    borderRadius: 8,
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  tokenIcon: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  tokenName: {
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  tokenAmount: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 2,
   },
   rowDivider: {
     height: 1,

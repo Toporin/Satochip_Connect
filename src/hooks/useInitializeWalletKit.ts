@@ -5,6 +5,7 @@ import SettingsStore from '@/store/SettingsStore';
 import {createWalletKit, walletKit} from '@/utils/WalletKitUtil';
 import { NFCManager } from '@/wallets/nfc/NFCManager';
 import { fetchBalancesForAllWallets } from '@/hooks/useBalanceFetching';
+import { fetchTokenBalancesForAllWallets } from '@/hooks/useTokenBalanceFetching';
 
 export default function useInitializeWalletKit() {
   const [initialized, setInitialized] = useState(false);
@@ -41,6 +42,9 @@ export default function useInitializeWalletKit() {
       console.log('Fetching balances after initialization...');
       fetchBalancesForAllWallets().catch(err => {
         console.error('Error fetching balances after initialization:', err);
+      });
+      fetchTokenBalancesForAllWallets().catch(err => {
+        console.error('Error fetching token balances after initialization:', err);
       });
     } catch (err: unknown) {
       console.error('WalletKit initialization failed:', err);

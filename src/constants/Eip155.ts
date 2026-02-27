@@ -242,6 +242,27 @@ export const EIP155_SIGNING_METHODS = {
   ETH_SEND_TRANSACTION: 'eth_sendTransaction',
 };
 
+// ChainIds for which token balances are displayed
+export const EIP155_TOKEN_SUPPORTED_CHAIN_IDS: number[] = [
+  1, 56, 137, 42161, 8453, 43114, 10, 42220, 324, 11155111,
+  //250, 100, // 250 (Fantom) and 100 (Gnosis) have no Alchemy token API support
+];
+
+// ChainIds that have Alchemy token API support → network slug mapping
+// 250 (Fantom) and 100 (Gnosis) have no Alchemy token API support → omitted
+export const ALCHEMY_NETWORK_SLUGS: Record<number, string> = {
+  1:        'eth-mainnet',
+  56:       'bnb-mainnet',
+  137:      'polygon-mainnet',
+  42161:    'arb-mainnet',
+  8453:     'base-mainnet',
+  43114:    'avax-mainnet',
+  10:       'opt-mainnet',
+  42220:    'celo-mainnet',
+  324:      'zksync-mainnet',
+  11155111: 'eth-sepolia',
+};
+
 // todo: fetch rpcs from https://chainlist.org/rpcs.json
 export const EIP155_RPCS_BY_CHAINS: { [key: number]: string[] } = {
   // Ethereum Mainnet
