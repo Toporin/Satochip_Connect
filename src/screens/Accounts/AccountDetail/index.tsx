@@ -19,10 +19,13 @@ import SettingsStore from '@/store/SettingsStore';
 import { AccountsStackScreenProps } from '@/utils/TypesUtil';
 import { SatochipInfo, WalletType } from '@/types/WalletTypes';
 import BalanceTable from '@/components/BalanceTable';
+import NftTable from '@/components/NftTable';
 import { fetchBalancesForAllWallets } from '@/hooks/useBalanceFetching';
 import { fetchTokenBalancesForAllWallets } from '@/hooks/useTokenBalanceFetching';
-import { BalanceEntry } from '@/services/BalanceService';
+import { fetchNftBalancesForAllWallets } from '@/hooks/useNftFetching';
+import type { BalanceEntry } from '@/services/BalanceService';
 import type { TokenBalanceEntry } from '@/services/TokenService';
+import type { NftEntry } from '@/services/NftService';
 import { EIP155_CHAINS } from '@/constants/Eip155';
 import styles from './styles';
 
@@ -39,7 +42,7 @@ export default function AccountDetail({ route, navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
 
   // Subscribe to store
-  const { wallets, balances, tokenBalances } = useSnapshot(SettingsStore.state);
+  const { wallets, balances, tokenBalances, nftBalances } = useSnapshot(SettingsStore.state);
 
   // Get wallet
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -82,6 +85,39 @@ export default function AccountDetail({ route, navigation }: Props) {
 
     return result;
   }, [walletInfo, tokenBalances]);
+
+  // Filter and group NFT balances for this wallet address by chainId
+  const addressNftBalances = useMemo((): Map<number, NftEntry[]> => {
+    if (!walletInfo) return new Map();
+    const walletAddress = walletInfo.address;
+    const result = new Map<number, NftEntry[]>();
+
+    for (const [key, entry] of Object.entries(nftBalances)) {
+      if (key.startsWith(`${walletAddress}:`)) {
+        const chainId = (entry as NftEntry).chainId;
+        const bucket = result.get(chainId);
+        if (bucket) {
+          bucket.push(entry as NftEntry);
+        } else {
+          result.set(chainId, [entry as NftEntry]);
+        }
+      }
+    }
+
+    // Sort each chain's entries by name
+    for (const [chainId, entries] of result) {
+      result.set(
+        chainId,
+        entries.sort((a, b) => {
+          const nameA = a.name || a.contractName || a.contract;
+          const nameB = b.name || b.contractName || b.contract;
+          return nameA.localeCompare(nameB);
+        })
+      );
+    }
+
+    return result;
+  }, [walletInfo, nftBalances]);
 
   // Filter and sort native balances for this wallet address.
   // Also includes zero-balance native entries for chains that have tokens.
@@ -225,6 +261,7 @@ export default function AccountDetail({ route, navigation }: Props) {
       await Promise.all([
         fetchBalancesForAllWallets(),
         fetchTokenBalancesForAllWallets(),
+        fetchNftBalancesForAllWallets(),
       ]);
     } catch (error) {
       console.error('Failed to refresh balances:', error);
@@ -335,6 +372,17 @@ export default function AccountDetail({ route, navigation }: Props) {
 
         {/* Balance section */}
         <BalanceTable addressBalances={addressBalances} addressTokenBalances={addressTokenBalances} />
+
+        {/* NFT section */}
+        <NftTable
+          address={walletInfo.address}
+          addressNftBalances={addressNftBalances}
+          onNftPress={entry =>
+            navigation.navigate('NftDetail', {
+              nftKey: `${walletInfo.address}:${entry.chainId}:${entry.contract}:${entry.tokenId}`,
+            })
+          }
+        />
 
         {/* Action buttons row */}
         <View style={styles.buttonRow}>

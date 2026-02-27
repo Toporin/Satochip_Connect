@@ -85,6 +85,7 @@ export type AccountsStackParamList = {
   SetupSoftwareAccount: undefined;
   AccountDetails: { accountId: string };
   SendTransaction: { accountId: string; chainId?: number, chainIds?: number[] };
+  NftDetail: { nftKey: string };
 };
 
 export type SettingsStackParamList = {

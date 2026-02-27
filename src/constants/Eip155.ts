@@ -244,8 +244,29 @@ export const EIP155_SIGNING_METHODS = {
 
 // ChainIds for which token balances are displayed
 export const EIP155_TOKEN_SUPPORTED_CHAIN_IDS: number[] = [
-  1, 56, 137, 42161, 8453, 43114, 10, 42220, 324, 11155111,
-  //250, 100, // 250 (Fantom) and 100 (Gnosis) have no Alchemy token API support
+  1,      // Ethereum
+  56,     // Binance Smart Chain
+  137,    // Polygon
+  42161,  // Arbitrum One
+  8453,   // Base
+  43114,  // Avalanche
+  10,     // Optimism
+  42220,  // Celo
+  324,    // zkSync
+  11155111,// Sepolia
+  //250, // Fantom has no Alchemy token API support
+  // 100, // Gnosis has no Alchemy token API support
+];
+
+// ChainIds for which NFT balances are displayed (Alchemy NFT API support)
+export const EIP155_NFT_SUPPORTED_CHAIN_IDS: number[] = [
+  1,     // Ethereum
+  56,    // Binance Smart Chain
+  137,   // Polygon
+  // 42161, // Arbitrum One
+  // 8453,  // Base
+  // 43114, // Avalanche
+  // 10,    // Optimism
 ];
 
 // ChainIds that have Alchemy token API support → network slug mapping

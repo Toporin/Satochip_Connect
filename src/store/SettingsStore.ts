@@ -15,6 +15,7 @@ import { SatochipWallet } from '@/wallets/satochip/SatochipWallet';
 import { EIP155SoftwareWallet } from '@/wallets/EIP155SoftwareWallet';
 import type { BalanceEntry } from '@/services/BalanceService';
 import type { TokenBalanceEntry } from '@/services/TokenService';
+import type { NftEntry } from '@/services/NftService';
 
 /**
  * Types
@@ -48,6 +49,12 @@ interface State {
   tokenBalancesLoading: boolean;
   tokenBalancesError: string | null;
   lastTokenBalanceFetch: number | null; // Timestamp for deduplication
+
+  // NFT balance management (in-memory only, no persistence)
+  nftBalances: Record<string, NftEntry>; // Key format: "address:chainId:contract:tokenId"
+  nftBalancesLoading: boolean;
+  nftBalancesError: string | null;
+  lastNftBalanceFetch: number | null; // Timestamp for deduplication
 }
 
 /**
@@ -76,6 +83,12 @@ const state = proxy<State>({
   tokenBalancesLoading: false,
   tokenBalancesError: null,
   lastTokenBalanceFetch: null,
+
+  // NFT balance management
+  nftBalances: {},
+  nftBalancesLoading: false,
+  nftBalancesError: null,
+  lastNftBalanceFetch: null,
 });
 
 /**
@@ -498,6 +511,55 @@ const SettingsStore = {
     const now = Date.now();
     const thirtySeconds = 30 * 1000;
     return now - state.lastTokenBalanceFetch < thirtySeconds;
+  },
+
+  // ============================================
+  // NFT Balance Management Methods
+  // ============================================
+
+  setNftBalancesLoading(loading: boolean) {
+    state.nftBalancesLoading = loading;
+  },
+
+  setNftBalancesError(error: string | null) {
+    state.nftBalancesError = error;
+  },
+
+  updateNftBalances(balances: Record<string, NftEntry>) {
+    state.nftBalances = {
+      ...state.nftBalances,
+      ...balances,
+    };
+  },
+
+  getNftBalancesForAddress(address: string): NftEntry[] {
+    const result: NftEntry[] = [];
+    for (const [key, entry] of Object.entries(state.nftBalances)) {
+      if (key.startsWith(`${address}:`)) {
+        result.push(entry);
+      }
+    }
+    return result;
+  },
+
+  clearNftBalances() {
+    state.nftBalances = {};
+    state.nftBalancesLoading = false;
+    state.nftBalancesError = null;
+    state.lastNftBalanceFetch = null;
+  },
+
+  setLastNftBalanceFetch(timestamp: number) {
+    state.lastNftBalanceFetch = timestamp;
+  },
+
+  wereNftBalancesFetchedRecently(): boolean {
+    if (!state.lastNftBalanceFetch) {
+      return false;
+    }
+    const now = Date.now();
+    const thirtySeconds = 30 * 1000;
+    return now - state.lastNftBalanceFetch < thirtySeconds;
   },
 };
 

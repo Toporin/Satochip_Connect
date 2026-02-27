@@ -6,6 +6,7 @@ import {createWalletKit, walletKit} from '@/utils/WalletKitUtil';
 import { NFCManager } from '@/wallets/nfc/NFCManager';
 import { fetchBalancesForAllWallets } from '@/hooks/useBalanceFetching';
 import { fetchTokenBalancesForAllWallets } from '@/hooks/useTokenBalanceFetching';
+import { fetchNftBalancesForAllWallets } from '@/hooks/useNftFetching';
 
 export default function useInitializeWalletKit() {
   const [initialized, setInitialized] = useState(false);
@@ -38,13 +39,19 @@ export default function useInitializeWalletKit() {
       console.log('WalletKit initialization completed successfully');
       console.log(`Total wallets initialized: ${SettingsStore.getAllWallets().length}`);
 
-      // Fetch balances for all wallets after initialization
+      // Fetch balances and token balances after initialization
       console.log('Fetching balances after initialization...');
-      fetchBalancesForAllWallets().catch(err => {
+      const balancePromise = fetchBalancesForAllWallets().catch(err => {
         console.error('Error fetching balances after initialization:', err);
       });
-      fetchTokenBalancesForAllWallets().catch(err => {
+      const tokenPromise = fetchTokenBalancesForAllWallets().catch(err => {
         console.error('Error fetching token balances after initialization:', err);
+      });
+      // NFTs have lower priority — start after balances and tokens resolve
+      Promise.allSettled([balancePromise, tokenPromise]).then(() => {
+        fetchNftBalancesForAllWallets().catch(err => {
+          console.error('Error fetching NFTs after initialization:', err);
+        });
       });
     } catch (err: unknown) {
       console.error('WalletKit initialization failed:', err);

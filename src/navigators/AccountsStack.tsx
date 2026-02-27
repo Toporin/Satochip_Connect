@@ -8,6 +8,7 @@ import SatochipSetupScreen from '@/screens/Accounts/SatochipSetup';
 import SetupSoftwareAccountScreen from '@/screens/Accounts/SetupSoftwareAccount.tsx';
 import AccountDetailsScreen from '@/screens/Accounts/AccountDetail';
 import SendTransactionScreen from '@/screens/Accounts/SendTransaction';
+import NftDetailScreen from '@/screens/Accounts/NftDetail';
 
 const Stack = createStackNavigator<AccountsStackParamList>();
 
@@ -77,6 +78,15 @@ export default function AccountsStack() {
         component={SendTransactionScreen}
         options={{
           title: 'Send Transaction',
+        }}
+      />
+
+      {/* NFT detail screen */}
+      <Stack.Screen
+        name="NftDetail"
+        component={NftDetailScreen}
+        options={{
+          title: 'NFT Details',
         }}
       />
 
