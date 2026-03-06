@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4]
+
+* Add support for ERC20 and NFT display
+* Using Alchemy API
+* Currently support Token for Ethereum, Binance Smart Chain, Polygon, Arbitrum One, Base, Avalanche, Optimism, Celo, zkSync, Eth Sepolia testnet
+* Currently support NFTs for Ethereum, Binance Smart Chain & Polygon
+
 ## [0.1.3]
 
 * Disable Sentry

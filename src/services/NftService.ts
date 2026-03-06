@@ -58,7 +58,6 @@ class NftService {
           method: 'GET',
           headers: { accept: 'application/json' },
         });
-        console.warn(JSON.stringify(response, null, 2));
 
         if (!response.ok) {
           console.warn(
