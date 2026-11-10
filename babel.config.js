@@ -24,6 +24,7 @@ module.exports = {
           '@/wallets': './src/wallets',
           '@/lib': './src/lib',
           '@/services': './src/services',
+          '@/airgap': './src/airgap',
         },
       },
     ],
