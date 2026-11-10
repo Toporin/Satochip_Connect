@@ -25,6 +25,8 @@ import {
   parseDERSignature,
   recoverVValue,
 } from '@/utils/SignatureUtils';
+import { AirgapDataType } from '@/airgap/signRequest';
+import { AirgapSignature, finalizeSignature } from '@/airgap/signing';
 
 export class SatochipWallet implements ISatochipWallet {
   public readonly type = WalletType.SATOCHIP;
@@ -88,6 +90,35 @@ export class SatochipWallet implements ISatochipWallet {
         error as Error,
       );
     }
+  }
+
+  /**
+   * Sign a 32-byte hash for an ERC-4527 (QR air-gapped) request.
+   * Reuses the existing card flow (signWithSatochip) and returns r/s/v with
+   * low-s enforced, verified to recover to this account's address.
+   *
+   * @param hash - 0x-prefixed 32-byte hash computed from the request sign-data
+   * @param card - Satochip card instance (NFC session handled by the caller)
+   * @param pin - PIN for the card
+   * @param dataType - ERC-4527 data type (determines the v format)
+   * @param chainId - chain id (required for legacy transactions)
+   */
+  public async signHashForAirgap(
+    hash: string,
+    card: SatochipCard,
+    pin: string,
+    dataType: AirgapDataType,
+    chainId?: number,
+  ): Promise<AirgapSignature> {
+    if (ethers.utils.hexDataLength(hash) !== 32) {
+      throw new WalletError(WalletErrorType.SIGNING_FAILED, 'Invalid hash length');
+    }
+    const der = await this.signTransactionHash(
+      Buffer.from(ethers.utils.arrayify(hash)),
+      card,
+      pin,
+    );
+    return finalizeSignature(hash, der, this.satochipInfo.address, dataType, chainId);
   }
 
   /**
