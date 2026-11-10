@@ -186,6 +186,10 @@ export default StyleSheet.create({
     marginTop: 0,
     marginBottom: 16,
   },
+  airgapButton: {
+    marginTop: 12,
+    flex: 0,
+  },
   actionButton: {
     flex: 1,
     paddingVertical: 12,

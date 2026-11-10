@@ -10,6 +10,9 @@ import {LogList} from '@/screens/LogList';
 import {AppLogs} from '@/screens/AppLogs';
 import {useLogs} from '@/hooks/useLogs';
 import {useAppLogger} from '@/hooks/useAppLogger';
+import AirgapSync from '@/screens/Airgap/SyncScreen';
+import AirgapReview from '@/screens/Airgap/ReviewScreen';
+import AirgapSignature from '@/screens/Airgap/SignatureScreen';
 
 const StackNavigator = createStackNavigator<RootStackParamList>();
 
@@ -69,6 +72,38 @@ export function RootStackNavigator() {
             headerShown: true,
             title: 'Application Logs',
             headerBackTitle: '',
+            headerTintColor: Theme['fg-100'],
+          }}
+        />
+        <StackNavigator.Screen
+          name="AirgapSync"
+          component={AirgapSync}
+          options={{
+            headerShown: true,
+            title: 'Connect browser extension',
+            headerBackTitle: '',
+            headerTintColor: Theme['fg-100'],
+          }}
+        />
+        <StackNavigator.Screen
+          name="AirgapReview"
+          component={AirgapReview}
+          options={{
+            headerShown: true,
+            title: 'Review request',
+            headerBackTitle: '',
+            headerTintColor: Theme['fg-100'],
+          }}
+        />
+        <StackNavigator.Screen
+          name="AirgapSignature"
+          component={AirgapSignature}
+          options={{
+            headerShown: true,
+            title: 'Signature',
+            headerBackTitle: '',
+            headerLeft: () => null,
+            gestureEnabled: false,
             headerTintColor: Theme['fg-100'],
           }}
         />

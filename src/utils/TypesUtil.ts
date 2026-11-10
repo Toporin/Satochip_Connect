@@ -66,6 +66,9 @@ export type RootStackParamList = {
   Scan: undefined;
   Logs: undefined;
   AppLogs: undefined;
+  AirgapSync: {accountId: string};
+  AirgapReview: {cborHex: string; urType: string};
+  AirgapSignature: {cborHex: string; summary?: string};
 };
 
 export type HomeTabParamList = {

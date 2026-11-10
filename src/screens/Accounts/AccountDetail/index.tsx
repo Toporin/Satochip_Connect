@@ -442,6 +442,18 @@ export default function AccountDetail({ route, navigation }: Props) {
               {renderInfoField('Derivation Path', (walletInfo as SatochipInfo).derivationPath, true)}
               {renderInfoField('xPub', (walletInfo as SatochipInfo).xpub, true)}
             </View>
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                styles.airgapButton,
+                { backgroundColor: Theme['accent-100'] },
+              ]}
+              onPress={() => navigation.navigate('AirgapSync', { accountId })}
+              activeOpacity={0.7}>
+              <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
+                Connect to browser extension (QR)
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
