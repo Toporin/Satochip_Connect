@@ -17,7 +17,14 @@ config.resolver = {
   sourceExts: [...config.resolver.sourceExts, 'svg'],
   nodeModulesPaths: [
     path.resolve(__dirname, 'node_modules'),
-  ]
+  ],
+  // Don't watch native build outputs: Gradle/Xcode create & delete dirs there
+  // during builds, which crashes Metro's fallback watcher (ENOENT) without watchman.
+  blockList: [
+    ...[].concat(config.resolver.blockList ?? []),
+    /.*\/android\/.*\/build\/.*/,
+    /.*\/ios\/build\/.*/,
+  ],
 };
 
 module.exports = withSentryConfig(config);

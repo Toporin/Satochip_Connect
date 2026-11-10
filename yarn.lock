@@ -4300,7 +4300,7 @@ __metadata:
     react-native-vision-camera: 4.7.2
     react-test-renderer: 19.1.1
     readable-stream: 1.0.33
-    satochip-react-native: "github:Toporin/satochip-react-native#1076e7c097571d561b5b903f31c6337455def19e"
+    satochip-react-native: "github:Toporin/satochip-react-native#dc934769163d591a2cf43f96fef18af564af0894"
     stream-browserify: 3.0.0
     typescript: ^5.8.3
     valtio: 2.1.8
@@ -11410,9 +11410,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"satochip-react-native@github:Toporin/satochip-react-native#1076e7c097571d561b5b903f31c6337455def19e":
-  version: 0.1.4
-  resolution: "satochip-react-native@https://github.com/Toporin/satochip-react-native.git#commit=1076e7c097571d561b5b903f31c6337455def19e"
+"satochip-react-native@github:Toporin/satochip-react-native#dc934769163d591a2cf43f96fef18af564af0894":
+  version: 0.1.7
+  resolution: "satochip-react-native@https://github.com/Toporin/satochip-react-native.git#commit=dc934769163d591a2cf43f96fef18af564af0894"
   dependencies:
     asn1js: ^3.0.6
     bech32: 2.0.0
@@ -11428,7 +11428,7 @@ __metadata:
   peerDependencies:
     react-native: ">=0.60.0"
     react-native-nfc-manager: ">=3.13.2"
-  checksum: a20c595a4f6be26674ae91156dc3ddf3643e99402a5921d333bdffdc0f850ec2b7e4316c42d1830decdfa4d1def6fba8cdf58bd8f72e0ab0757c28660a14f18f
+  checksum: c1338e8fd08c6844133ee34b6d7fa92471e5026788669bb29f1c045876306476b3eb0b2dc791126e132be6820a76a649f85f2769a73e968ea590eda741578660
   languageName: node
   linkType: hard
 

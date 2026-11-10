@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6]
+
+Add support for Satochip applet v0.16 cards. Update Satochip-React-native library to v0.1.7:
+* Raise the Android NFC transceive timeout to 5 s (v0.16 cards need ~1.1 s to initiate the secure channel)
+* Parse the authentikey coordx returned by v0.16 cards when initiating the secure channel
+* Check the authentikey of legacy (pre-v0.16) cards
+
+Dev: Metro no longer watches the Android/iOS build folders (fixes a Metro crash during builds without watchman).
+
 ## [0.1.5]
 
 Update Satochip-React-native library t0 v0.1.4 (patch pubkey recovery bug).
