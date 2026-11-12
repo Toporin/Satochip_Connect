@@ -9,7 +9,7 @@ import {
   useCameraPermission,  // Add this
 } from 'react-native-vision-camera';
 import {useIsFocused} from '@react-navigation/native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import SvgChevronRight from '@/assets/ChevronRight';
 import {RootStackScreenProps} from '@/utils/TypesUtil';
@@ -25,6 +25,7 @@ export default function Scan({navigation}: Props) {
 
   // 2. Only activate Camera when the app is focused and this screen is currently opened
   const isActive = useIsFocused();
+  const insets = useSafeAreaInsets();
 
   // ERC-4527 (UR) multipart scanning state. Kept in refs: the code scanner
   // callback fires for every camera frame, so we avoid re-rendering per frame.
@@ -138,7 +139,7 @@ export default function Scan({navigation}: Props) {
       )}
 
       {(urPercent !== null || urError) && (
-        <View style={styles.urOverlay}>
+        <View style={[styles.urOverlay, {bottom: 24 + insets.bottom}]}>
           {urPercent !== null && (
             <>
               <Text style={styles.urText}>Scanning animated QR code… {urPercent}%</Text>
