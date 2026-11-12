@@ -2,6 +2,10 @@ import {useCallback, useEffect} from 'react';
 import Config from 'react-native-config';
 import {Linking, Platform, StatusBar, useColorScheme} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
+import {
+  SafeAreaProvider,
+  initialWindowMetrics,
+} from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import BootSplash from 'react-native-bootsplash';
 import Toast from 'react-native-toast-message';
@@ -148,6 +152,7 @@ const App = () => {
   }, [deeplinkHandler]);
 
   return (
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
     <ThemeProvider>
       <NavigationContainer>
         <StatusBar
@@ -160,6 +165,7 @@ const App = () => {
         />
       </NavigationContainer>
     </ThemeProvider>
+    </SafeAreaProvider>
   );
 };
 
