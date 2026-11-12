@@ -5,6 +5,7 @@ import {RootStackScreenProps} from '@/utils/TypesUtil';
 import SettingsStore from '@/store/SettingsStore';
 import {SatochipInfo, WalletType} from '@/types/WalletTypes';
 import {useTheme} from '@/hooks/useTheme';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ActionButton} from '@/components/ActionButton';
 import {buildSyncUR} from '@/airgap/syncPayload';
 import {AnimatedUrQR} from './AnimatedUrQR';
@@ -13,6 +14,7 @@ type Props = RootStackScreenProps<'AirgapSync'>;
 
 export default function SyncScreen({route, navigation}: Props) {
   const Theme = useTheme();
+  const insets = useSafeAreaInsets();
   const {accountId} = route.params;
   const wallet = SettingsStore.getWallet(accountId);
   const info =
@@ -35,7 +37,7 @@ export default function SyncScreen({route, navigation}: Props) {
   return (
     <ScrollView
       style={{backgroundColor: Theme['bg-100']}}
-      contentContainerStyle={styles.content}>
+      contentContainerStyle={[styles.content, {paddingBottom: 16 + insets.bottom}]}>
       {info && (
         <View style={styles.header}>
           <Text style={[styles.name, {color: Theme['fg-100']}]}>{info.name}</Text>

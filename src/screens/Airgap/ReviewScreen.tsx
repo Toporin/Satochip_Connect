@@ -1,6 +1,7 @@
 import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {Alert, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {SatochipCard} from 'satochip-react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {RootStackScreenProps} from '@/utils/TypesUtil';
 import {useTheme} from '@/hooks/useTheme';
@@ -34,6 +35,7 @@ function errorMessage(e: unknown): string {
 
 export default function ReviewScreen({route, navigation}: Props) {
   const Theme = useTheme();
+  const insets = useSafeAreaInsets();
   const {cborHex, urType} = route.params;
 
   const [showPinModal, setShowPinModal] = useState(false);
@@ -113,7 +115,11 @@ export default function ReviewScreen({route, navigation}: Props) {
 
   if (!parsed) {
     return (
-      <View style={[styles.errorContainer, {backgroundColor: Theme['bg-100']}]}>
+      <View
+        style={[
+          styles.errorContainer,
+          {backgroundColor: Theme['bg-100'], paddingBottom: 24 + insets.bottom},
+        ]}>
         <Text style={[styles.errorTitle, {color: Theme['error-100']}]}>Cannot sign this request</Text>
         <Text style={[styles.text, {color: Theme['fg-150']}]}>{error}</Text>
         <ActionButton style={styles.fullButton} onPress={() => navigation.goBack()}>
@@ -167,7 +173,11 @@ export default function ReviewScreen({route, navigation}: Props) {
         ) : null}
       </ScrollView>
 
-      <View style={[styles.footer, {borderColor: Theme['bg-300']}]}>
+      <View
+        style={[
+          styles.footer,
+          {borderColor: Theme['bg-300'], paddingBottom: 16 + insets.bottom},
+        ]}>
         <ActionButton
           secondary
           style={styles.halfButton}
