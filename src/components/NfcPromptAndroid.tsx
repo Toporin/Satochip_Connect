@@ -4,6 +4,7 @@ import React from 'react';
 import Text from '@/components/KeeperText';
 import { windowWidth } from '@/constants/responsive';
 import NfcManager from 'react-native-nfc-manager';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/context/ThemeContext';
 
 function NfcPrompt({
@@ -74,6 +75,7 @@ function NfcPrompt({
     <Modal transparent visible={visible}>
       <View style={[styles.wrapper]}>
         <View style={{ flex: 1 }} />
+        <SafeAreaView edges={['bottom']} style={styles.promptSafeArea}>
         <Animated.View style={[styles.prompt, promptAnimStyle]}>
           <View style={[styles.center, { backgroundColor }]}>
             <NFCSVG />
@@ -87,6 +89,7 @@ function NfcPrompt({
             </Pressable>
           </View>
         </Animated.View>
+        </SafeAreaView>
         <Animated.View style={[styles.promptBg, bgAnimStyle]} />
       </View>
     </Modal>
@@ -107,6 +110,10 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     zIndex: 1,
+  },
+  promptSafeArea: {
+    zIndex: 2,
+    alignSelf: 'stretch',
   },
   prompt: {
     height: 300,

@@ -2,6 +2,7 @@ import {useSnapshot} from 'valtio';
 import {useCallback, useMemo} from 'react';
 import {StyleSheet, View} from 'react-native';
 import RNModal from 'react-native-modal';
+import {SafeAreaProvider} from 'react-native-safe-area-context';
 
 import ModalStore from '@/store/ModalStore';
 import SessionProposalModal from '@/modals/SessionProposalModal';
@@ -50,7 +51,8 @@ export default function Modal() {
       onModalHide={onClose}
       style={styles.modal}
       isVisible={open}>
-      {componentView}
+      {/* The modal is a separate native window: measure its own insets */}
+      <SafeAreaProvider style={styles.provider}>{componentView}</SafeAreaProvider>
     </RNModal>
   );
 }
@@ -59,5 +61,8 @@ const styles = StyleSheet.create({
   modal: {
     margin: 0,
     justifyContent: 'flex-end',
+  },
+  provider: {
+    flex: 0,
   },
 });

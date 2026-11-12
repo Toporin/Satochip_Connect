@@ -1,5 +1,6 @@
 import {View, StyleSheet} from 'react-native';
 import {Verify} from '@walletconnect/types';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {ActionButton} from '@/components/ActionButton';
 import VerifyInfoBox from '@/components/VerifyInfoBox';
@@ -23,6 +24,7 @@ export function ModalFooter({
   disableApprove,
 }: ModalFooterProps) {
   const Theme = useTheme();
+  const insets = useSafeAreaInsets();
   const validation = verifyContext?.verified.validation;
   const isScam = verifyContext?.verified.isScam;
 
@@ -36,7 +38,8 @@ export function ModalFooter({
       : Theme['verify-unknown'];
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[styles.container, {paddingBottom: Math.max(32, insets.bottom + 16)}]}>
       <VerifyInfoBox isScam={isScam} validation={validation} />
       <View style={styles.buttonContainer}>
         <ActionButton
@@ -65,7 +68,6 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     marginHorizontal: 16,
-    paddingBottom: 32,
   },
   buttonContainer: {
     marginTop: 16,
