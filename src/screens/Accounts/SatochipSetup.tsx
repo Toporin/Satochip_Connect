@@ -47,14 +47,26 @@ export default function SatochipSetupScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (masterXfp) {
       // Check if we already have accounts for this card
+      // (fingerprints may be stored in different cases: compare case-insensitively)
       const existingWallets = SettingsStore.getSatochipWallets();
       const cardWallets = existingWallets.filter(w => {
         const info = w.getWalletInfo();
-        return info.masterXfp === masterXfp;
+        return info.masterXfp?.toUpperCase() === masterXfp.toUpperCase();
       });
-      
-      // Set the next available account index
-      setAccountIndex(cardWallets.length);
+
+      // Set the next available account index: the lowest index not yet used
+      // by this card (accounts may have been deleted out of order)
+      const usedIndexes = new Set(
+        cardWallets.map(w => {
+          const match = /\/(\d+)$/.exec(w.getWalletInfo().derivationPath);
+          return match ? Number(match[1]) : -1;
+        }),
+      );
+      let nextIndex = 0;
+      while (usedIndexes.has(nextIndex)) {
+        nextIndex++;
+      }
+      setAccountIndex(nextIndex);
     }
   }, [masterXfp]);
 
@@ -65,8 +77,10 @@ export default function SatochipSetupScreen({ navigation, route }: Props) {
       // Create HD node from xpub
       const hdNode = ethers.utils.HDNode.fromExtendedKey(xpub);
 
-      // Derive path (e.g., "0/0" for first address)
-      const derived = hdNode.derivePath(derivationPath);
+      // The stored xpub is the account-level key at m/44'/60'/0' (depth 3):
+      // derive relative to it (e.g., "0/0" for the first address).
+      // A full "m/..." path is rejected by ethers on a non-root node.
+      const derived = hdNode.derivePath(`0/${accountIndex}`);
 
       // Get the address
       const address = derived.address;
@@ -77,7 +91,7 @@ export default function SatochipSetupScreen({ navigation, route }: Props) {
       console.error('SatochipSetupScreen - error deriving preview address:', error);
       setCurrentAddress('');
     }
-  }, [xpub, derivationPath]);
+  }, [xpub, accountIndex]);
 
   const validateInputs = () => {
     //todo: check that address not already used!
