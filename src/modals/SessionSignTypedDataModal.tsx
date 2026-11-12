@@ -17,7 +17,7 @@ import ModalStore from '@/store/ModalStore';
 import {RequestModal} from './RequestModal';
 import {Chains} from '@/components/Modal/Chains';
 import {PresetsUtil} from '@/utils/PresetsUtil';
-import { SatochipCard } from 'satochip-react-native';
+import { SatochipCard, SatodimeCard } from 'satochip-react-native';
 import useSatochipModal from '@/hooks/useSatochipModal.ts';
 import { PinModal } from '@/components/Modal/PinModal.tsx';
 import NfcPrompt from '@/components/NfcPromptAndroid.tsx';
@@ -36,9 +36,6 @@ export default function SessionSignTypedDataModal() {
 
   // PIN modal state
   const [showPinModal, setShowPinModal] = useState(false);
-  // satochip
-  const card = useRef(new SatochipCard()).current;
-  const { withModal, nfcVisible, closeNfc } = useSatochipModal(card);
 
   // Get required request data
   const {topic, params} = requestEvent!;
@@ -50,6 +47,11 @@ export default function SessionSignTypedDataModal() {
   const address = getEIP155AddressesFromParams(params);
   const wallet = SettingsStore.getWalletByAddress(address);
   const walletType = wallet?.type;
+  // NFC card for hardware accounts (Satodime vaults use a SatodimeCard, no PIN)
+  const card = useRef<SatochipCard | SatodimeCard>(
+    walletType === WalletType.SATODIME ? new SatodimeCard() : new SatochipCard(),
+  ).current;
+  const { withModal, nfcVisible, closeNfc } = useSatochipModal(card);
 
   const peerMetadata = session?.peer?.metadata as SignClientTypes.Metadata;
 
@@ -112,8 +114,10 @@ export default function SessionSignTypedDataModal() {
       } else {
         setShowPinModal(true);
       }
+    } else if (walletType === WalletType.SATODIME) {
+      // Satodime: no PIN, the card is scanned directly
+      await performApproval('');
     } else {
-      // TODO: support satodime
       await performApproval('');
     }
   }, [performApproval, wallet, walletType]);

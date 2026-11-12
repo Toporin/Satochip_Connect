@@ -6,7 +6,7 @@
 import { formatJsonRpcError, formatJsonRpcResult } from '@json-rpc-tools/utils';
 import { SignClientTypes } from '@walletconnect/types';
 import { getSdkError } from '@walletconnect/utils';
-import { SatochipCard } from 'satochip-react-native';
+import { SatochipCard, SatodimeCard } from 'satochip-react-native';
 
 import {
   ISoftwareWallet,
@@ -25,6 +25,7 @@ import {
 import { EIP155_SIGNING_METHODS } from '@/constants/Eip155';
 import SettingsStore from '@/store/SettingsStore.ts';
 import { SatochipWallet } from '@/wallets/satochip/SatochipWallet.ts';
+import { SatodimeWallet } from '@/wallets/satodime/SatodimeWallet';
 import { EIP155SoftwareWallet } from '@/wallets/EIP155SoftwareWallet.ts';
 import { extractChainId, broadcastTransaction } from '@/utils/EIP155Utils';
 
@@ -38,8 +39,8 @@ type RequestEventArgs = Omit<
  */
 export async function approveEIP155RequestEnhanced(
   requestEvent: RequestEventArgs,
-  pin: string, // PIN for hardware wallets, password for software wallet
-  card: SatochipCard,
+  pin: string, // PIN for Satochip, password for software wallet (unused for Satodime)
+  card: SatochipCard | SatodimeCard,
   withModal: any,
   closeNfc: any,
 ) {
@@ -94,8 +95,17 @@ export async function approveEIP155RequestEnhanced(
           signedMessage = await withModal(async () =>
             (wallet as SatochipWallet).signEthereumMessage(
               message,
-              card,
+              card as SatochipCard,
               pin,
+              address,
+              chainId,
+            ),
+          )();
+        } else if (wallet.type === WalletType.SATODIME) {
+          signedMessage = await withModal(async () =>
+            (wallet as SatodimeWallet).signEthereumMessage(
+              message,
+              card as SatodimeCard,
               address,
               chainId,
             ),
@@ -126,8 +136,19 @@ export async function approveEIP155RequestEnhanced(
               domain,
               types,
               data,
-              card,
+              card as SatochipCard,
               pin,
+              address,
+              chainId,
+            ),
+          )();
+        } else if (wallet.type === WalletType.SATODIME) {
+          signedData = await withModal(async () =>
+            (wallet as SatodimeWallet).signEIP712TypedData(
+              domain,
+              types,
+              data,
+              card as SatodimeCard,
               address,
               chainId,
             ),
@@ -158,8 +179,17 @@ export async function approveEIP155RequestEnhanced(
           signedTx = await withModal(async () =>
             (wallet as SatochipWallet).signEthereumTransaction(
               validatedTransaction,
-              card,
+              card as SatochipCard,
               pin,
+              address,
+              chainId,
+            ),
+          )();
+        } else if (wallet.type === WalletType.SATODIME) {
+          signedTx = await withModal(async () =>
+            (wallet as SatodimeWallet).signEthereumTransaction(
+              validatedTransaction,
+              card as SatodimeCard,
               address,
               chainId,
             ),
@@ -193,9 +223,13 @@ export async function approveEIP155RequestEnhanced(
     }
   } catch (error: any) {
     console.error('Error in enhanced EIP155 request handler:', error);
+    if (wallet && wallet.type === WalletType.SATODIME && error instanceof Error) {
+      // Satodime checks (wrong card, sealed vault, ownership...) must be shown to the user
+      return formatJsonRpcError(id, error.message);
+    }
     return formatJsonRpcError(id, 'An error occurred'); // generic error message
   } finally {
-    if (wallet && wallet.type === WalletType.SATOCHIP) {
+    if (wallet && (wallet.type === WalletType.SATOCHIP || wallet.type === WalletType.SATODIME)) {
       closeNfc();
       await card.endNfcSession();
     }

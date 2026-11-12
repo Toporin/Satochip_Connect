@@ -4,15 +4,20 @@ import { SessionTypes, Verify } from '@walletconnect/types';
 import { storage } from '@/utils/storage';
 import {
   ISatochipWallet,
+  ISatodimeWallet,
   ISoftwareWallet,
   IWalletProvider,
   SatochipInfo,
+  SatodimeInfo,
+  SatodimeVaultState,
   SensitiveInfo,
   SoftwareWalletInfo,
   WalletType,
 } from '@/types/WalletTypes';
 import { SatochipWallet } from '@/wallets/satochip/SatochipWallet';
 import { EIP155SoftwareWallet } from '@/wallets/EIP155SoftwareWallet';
+import { SatodimeWallet } from '@/wallets/satodime/SatodimeWallet';
+import { SecretStore } from '@/utils/SecretStore';
 import type { BalanceEntry } from '@/services/BalanceService';
 import type { TokenBalanceEntry } from '@/services/TokenService';
 import type { NftEntry } from '@/services/NftService';
@@ -166,6 +171,16 @@ const SettingsStore = {
         this.saveSoftwareWallets();
       } else if (wallet.type === WalletType.SATOCHIP){
         this.saveSatochipWallets();
+      } else if (wallet.type === WalletType.SATODIME){
+        this.saveSatodimeWallets();
+        // forget the card unlock secret once no account uses this card anymore
+        const authentikey = (wallet as ISatodimeWallet).satodimeInfo.authentikey;
+        const stillUsed = this.getSatodimeWallets()
+          .some(w => w.satodimeInfo.authentikey.toLowerCase() === authentikey.toLowerCase());
+        if (!stillUsed) {
+          SecretStore.deleteSatodimeUnlockSecret(authentikey).catch(error =>
+            console.error('Failed to delete Satodime unlock secret:', (error as Error).message));
+        }
       }
     }
   },
@@ -206,6 +221,64 @@ const SettingsStore = {
   getSatochipWallets(): ISatochipWallet[] {
     return Array.from(state.wallets.values())
       .filter(wallet => wallet.type === WalletType.SATOCHIP) as ISatochipWallet[];
+  },
+
+  getSatodimeWallets(): ISatodimeWallet[] {
+    return Array.from(state.wallets.values())
+      .filter(wallet => wallet.type === WalletType.SATODIME) as ISatodimeWallet[];
+  },
+
+  /**
+   * Save Satodime vault accounts (public data only) in persistent memory.
+   * The card unlock secret is stored separately in the secure keychain.
+   */
+  async saveSatodimeWallets() {
+    try {
+      const satodimeInfos = this.getSatodimeWallets().map(wallet => wallet.satodimeInfo);
+      await storage.setItem('SATODIME_VAULTS', JSON.stringify(satodimeInfos));
+      console.log(`Saved ${satodimeInfos.length} satodime wallets to persistent memory`);
+    } catch (error) {
+      console.error('Failed to save Satodime vaults:', error);
+    }
+  },
+
+  async loadSatodimeWallets() {
+    try {
+      const vaults = await storage.getItem('SATODIME_VAULTS');
+      if (vaults) {
+        const satodimeInfos = vaults as SatodimeInfo[];
+        for (const satodimeInfo of satodimeInfos) {
+          this.addWallet(new SatodimeWallet(satodimeInfo));
+        }
+        console.log(`Loaded ${satodimeInfos.length} Satodime wallets from persistent memory to store`);
+      }
+    } catch (error) {
+      console.error('Failed to load Satodime vaults:', error);
+    }
+  },
+
+  /** Create (or replace) a Satodime vault account and persist it. */
+  createSatodimeWallet(satodimeInfo: SatodimeInfo): ISatodimeWallet | undefined {
+    try {
+      const wallet = new SatodimeWallet(satodimeInfo);
+      this.addWallet(wallet);
+      this.saveSatodimeWallets();
+      return wallet;
+    } catch (error) {
+      console.error('Error creating Satodime wallet:', error);
+    }
+  },
+
+  /** Update the stored state of a Satodime vault after a card scan. */
+  updateSatodimeVaultState(walletId: string, vaultState: SatodimeVaultState) {
+    const wallet = state.wallets.get(walletId);
+    if (!wallet || wallet.type !== WalletType.SATODIME) {
+      return;
+    }
+    const info = (wallet as ISatodimeWallet).satodimeInfo;
+    if (info.vaultState !== vaultState) {
+      this.createSatodimeWallet({ ...info, vaultState });
+    }
   },
 
   /**
