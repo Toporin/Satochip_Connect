@@ -1,3 +1,4 @@
+import type { ScannedSatodime } from '@/wallets/satodime/SatodimeClient';
 import {NavigatorScreenParams} from '@react-navigation/native';
 import {StackScreenProps} from '@react-navigation/stack';
 import {CompositeScreenProps} from '@react-navigation/native';
@@ -89,6 +90,8 @@ export type AccountsStackParamList = {
   AccountDetails: { accountId: string };
   SendTransaction: { accountId: string; chainId?: number, chainIds?: number[] };
   NftDetail: { nftKey: string };
+  AddSatodimeAccount: undefined;
+  SatodimeVaultSelect: { scan: ScannedSatodime };
 };
 
 export type SettingsStackParamList = {

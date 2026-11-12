@@ -55,6 +55,7 @@ export interface SatodimeNetwork {
 }
 
 /** Decode a raw SLIP-44 value read from a vault. */
+/* eslint-disable no-bitwise -- SLIP-44 values are 32-bit flags */
 export function decodeSatodimeSlip44(raw: number): SatodimeNetwork {
   const value = raw >>> 0;
   const isTestnet = (value & SLIP44_MAINNET_BIT) === 0;
@@ -81,6 +82,7 @@ export function decodeSatodimeSlip44(raw: number): SatodimeNetwork {
     defaultChainId,
   };
 }
+/* eslint-enable no-bitwise */
 
 export const SATODIME_VAULT_STATE_LABELS: Readonly<Record<SatodimeVaultState, string>> = {
   [SatodimeVaultState.UNINITIALIZED]: 'Uninitialized',

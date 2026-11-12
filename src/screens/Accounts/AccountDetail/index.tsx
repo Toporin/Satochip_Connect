@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   Text,
   View,
@@ -8,6 +8,7 @@ import {
   Modal,
   RefreshControl,
   Linking,
+  Alert,
 } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import Toast from 'react-native-toast-message';
@@ -17,7 +18,13 @@ import QRCode from 'react-native-qrcode-svg';
 import { useTheme } from '@/hooks/useTheme';
 import SettingsStore from '@/store/SettingsStore';
 import { AccountsStackScreenProps } from '@/utils/TypesUtil';
-import { SatochipInfo, WalletType } from '@/types/WalletTypes';
+import { SatochipInfo, SatodimeInfo, SatodimeVaultState, WalletType } from '@/types/WalletTypes';
+import { SatodimeCard } from 'satochip-react-native';
+import useSatochipModal from '@/hooks/useSatochipModal';
+import NfcPrompt from '@/components/NfcPromptAndroid';
+import { decodeSatodimeSlip44, SATODIME_VAULT_STATE_LABELS } from '@/constants/Satodime';
+import { readSatodimeVaultState } from '@/wallets/satodime/SatodimeClient';
+import { handleSatodimeError } from '@/wallets/satodime/satodimeNfc';
 import BalanceTable from '@/components/BalanceTable';
 import NftTable from '@/components/NftTable';
 import { fetchBalancesForAllWallets } from '@/hooks/useBalanceFetching';
@@ -51,7 +58,41 @@ export default function AccountDetail({ route, navigation }: Props) {
   // Extract wallet info and type (must be called before any conditional returns)
   const walletInfo = useMemo(() => wallet?.getWalletInfo(), [wallet]);
 
-  const isHardware = useMemo(() => wallet?.type === WalletType.SATOCHIP, [wallet]);
+  const isSatodime = wallet?.type === WalletType.SATODIME;
+  const isHardware = useMemo(
+    () => wallet?.type === WalletType.SATOCHIP || wallet?.type === WalletType.SATODIME,
+    [wallet],
+  );
+  const satodimeInfo = isSatodime ? (walletInfo as SatodimeInfo) : undefined;
+  const satodimeNetwork = satodimeInfo ? decodeSatodimeSlip44(satodimeInfo.slip44) : undefined;
+  const isWatchOnly = satodimeInfo !== undefined && satodimeInfo.vaultState !== SatodimeVaultState.UNSEALED;
+
+  // Satodime: re-scan the card to refresh the vault state (e.g. after unsealing it in the Satodime app)
+  const satodimeCard = useRef(new SatodimeCard()).current;
+  const { withModal, nfcVisible, closeNfc } = useSatochipModal(satodimeCard);
+  const rescanSatodimeVault = useCallback(async () => {
+    if (!satodimeInfo) {
+      return;
+    }
+    try {
+      const run = withModal(() => readSatodimeVaultState(satodimeCard, satodimeInfo));
+      if (!run) {
+        throw new Error('NFC is not supported on this platform');
+      }
+      const state = (await run()) as SatodimeVaultState;
+      SettingsStore.updateSatodimeVaultState(satodimeInfo.id, state);
+      Toast.show({
+        type: state === SatodimeVaultState.UNSEALED ? 'success' : 'info',
+        text1: `Vault #${satodimeInfo.vaultIndex + 1}: ${SATODIME_VAULT_STATE_LABELS[state]}`,
+        text2: state === SatodimeVaultState.UNSEALED ? 'This account can now send.' : 'This account stays watch-only.',
+      });
+    } catch (error) {
+      Toast.show({ type: 'error', text1: 'Failed to read the card', text2: handleSatodimeError(error) });
+    } finally {
+      closeNfc();
+      await satodimeCard.endNfcSession().catch(() => undefined);
+    }
+  }, [closeNfc, satodimeCard, satodimeInfo, withModal]);
 
   // Filter token balances for this wallet address, by chainId (non-zero, no error)
   const addressTokenBalances = useMemo((): Map<number, TokenBalanceEntry[]> => {
@@ -194,9 +235,9 @@ export default function AccountDetail({ route, navigation }: Props) {
       return addressBalances[0].chainId;
     }
 
-    // Strategy 3: Fallback to Ethereum mainnet
-    return 1;
-  }, [addressBalances]);
+    // Strategy 3: Satodime vault network (from its SLIP-44), else Ethereum mainnet
+    return satodimeNetwork?.defaultChainId ?? 1;
+  }, [addressBalances, satodimeNetwork]);
 
   // Guard: wallet not found
   if (!wallet || !walletInfo) {
@@ -349,7 +390,7 @@ export default function AccountDetail({ route, navigation }: Props) {
                   styles.accountTypeText,
                   { color: isHardware ? Theme['inverse-100'] : Theme['fg-150'] },
                 ]}>
-                {isHardware ? 'Hardware' : 'Software'}
+                {isSatodime ? 'Satodime' : isHardware ? 'Hardware' : 'Software'}
               </Text>
             </View>
           </View>
@@ -393,11 +434,24 @@ export default function AccountDetail({ route, navigation }: Props) {
               styles.actionButton,
               { backgroundColor: Theme['accent-100'] }
             ]}
-            onPress={() => navigation.navigate('SendTransaction', {
-              accountId: accountId,
-              chainId: getDefaultChainId(),
-              chainIds: addressBalances.map(entry => entry.chainId),
-            })}
+            onPress={() => {
+              if (isWatchOnly) {
+                Alert.alert(
+                  'Watch-only vault',
+                  'This Satodime vault is sealed: it cannot sign. Unseal it in the Satodime app, then re-scan the card here.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Re-scan card', onPress: rescanSatodimeVault },
+                  ],
+                );
+                return;
+              }
+              navigation.navigate('SendTransaction', {
+                accountId: accountId,
+                chainId: getDefaultChainId(),
+                chainIds: addressBalances.map(entry => entry.chainId),
+              });
+            }}
             activeOpacity={0.7}>
             <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
               Send
@@ -452,6 +506,40 @@ export default function AccountDetail({ route, navigation }: Props) {
               activeOpacity={0.7}>
               <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
                 Connect to browser extension (QR)
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Satodime vault details */}
+        {satodimeInfo && satodimeNetwork && (
+          <View style={styles.section}>
+            <NfcPrompt visible={nfcVisible} close={closeNfc} />
+            <Text style={[styles.sectionTitle, { color: Theme['fg-100'] }]}>
+              Satodime Details
+            </Text>
+            <View style={[styles.infoCard, { backgroundColor: Theme['bg-175'] }]}>
+              {renderInfoField('Network', satodimeNetwork.label, false)}
+              {renderInfoField('Vault', `#${satodimeInfo.vaultIndex + 1}`, false)}
+              {renderInfoField(
+                'State',
+                `${SATODIME_VAULT_STATE_LABELS[satodimeInfo.vaultState]}${isWatchOnly ? ' (watch-only)' : ''}`,
+                false,
+              )}
+              {satodimeInfo.cardLabel ? renderInfoField('Card label', satodimeInfo.cardLabel, false) : null}
+              {renderInfoField('Card authentikey', satodimeInfo.authentikey, true)}
+            </View>
+            {satodimeInfo.vaultState === SatodimeVaultState.UNSEALED && (
+              <Text style={[styles.sectionTitle, styles.satodimeWarning, { color: Theme['error-100'] }]}>
+                ⚠ Unsealed vault: anyone holding the card can spend from it.
+              </Text>
+            )}
+            <TouchableOpacity
+              style={[styles.actionButton, styles.airgapButton, { backgroundColor: Theme['accent-100'] }]}
+              onPress={rescanSatodimeVault}
+              activeOpacity={0.7}>
+              <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
+                Re-scan card
               </Text>
             </TouchableOpacity>
           </View>

@@ -145,7 +145,7 @@ export async function scanSatodime(card: SatodimeCard): Promise<ScannedSatodime>
       const keyslot = await card.getKeyslotStatus(index);
       const state = keyslot.state as number as SatodimeVaultState;
       const network = decodeSatodimeSlip44(keyslot.slip44);
-      const vault: ScannedVault = { index, state, slip44: keyslot.slip44 >>> 0, network };
+      const vault: ScannedVault = { index, state, slip44: keyslot.slip44, network };
       if (state !== SatodimeVaultState.UNINITIALIZED) {
         const pubkey = toHex(await card.getPubkey(index));
         vault.pubkey = pubkey;
@@ -267,4 +267,24 @@ export async function signDigestWithSatodime(
   } finally {
     card.setUnlockSecret(null);
   }
+}
+
+/**
+ * Re-read the state of an account's vault (e.g. after it was unsealed in the
+ * Satodime app), checking that the card and the vault key still match.
+ */
+export async function readSatodimeVaultState(card: SatodimeCard, info: SatodimeInfo): Promise<SatodimeVaultState> {
+  const authentikey = await readAuthentikey(card);
+  if (authentikey.toLowerCase() !== info.authentikey.toLowerCase()) {
+    throw new Error('Wrong card: the card authentikey does not match this account.');
+  }
+  const keyslot = await card.getKeyslotStatus(info.vaultIndex);
+  const state = keyslot.state as number as SatodimeVaultState;
+  if (state !== SatodimeVaultState.UNINITIALIZED) {
+    const pubkey = toHex(await card.getPubkey(info.vaultIndex));
+    if (pubkey.toLowerCase() !== info.pubkey.toLowerCase()) {
+      throw new Error(`Vault #${info.vaultIndex + 1} holds a different key than this account.`);
+    }
+  }
+  return state;
 }

@@ -38,6 +38,19 @@ export default StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
   },
+  sectionTitleRow: {
+    marginBottom: 12,
+  },
+  addButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  addButtonFlex: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
   addButtonText: {
     fontSize: 14,
     fontWeight: '600',

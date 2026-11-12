@@ -186,6 +186,10 @@ export default StyleSheet.create({
     marginTop: 0,
     marginBottom: 16,
   },
+  satodimeWarning: {
+    fontSize: 13,
+    marginTop: 8,
+  },
   airgapButton: {
     marginTop: 12,
     flex: 0,
