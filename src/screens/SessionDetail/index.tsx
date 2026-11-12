@@ -2,6 +2,7 @@ import {useCallback, useMemo, useState} from 'react';
 import {View, Text, ScrollView} from 'react-native';
 import {getSdkError} from '@walletconnect/utils';
 import {useNavigation} from '@react-navigation/native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {walletKit} from '@/utils/WalletKitUtil';
 import {ModalHeader} from '@/components/Modal/ModalHeader';
 import {useTheme} from '@/hooks/useTheme';
@@ -17,6 +18,7 @@ type Props = RootStackScreenProps<'SessionDetail'>;
 
 export default function SessionDetail({route}: Props) {
   const Theme = useTheme();
+  const insets = useSafeAreaInsets();
   const topic = route.params.topic;
   const nativagor = useNavigation();
   const [updated, setUpdated] = useState(new Date());
@@ -109,7 +111,10 @@ export default function SessionDetail({route}: Props) {
     <ScrollView
       bounces={false}
       style={[styles.container, {backgroundColor: Theme['bg-100']}]}
-      contentContainerStyle={styles.contentContainer}>
+      contentContainerStyle={[
+        styles.contentContainer,
+        {paddingBottom: 16 + insets.bottom},
+      ]}>
       <ModalHeader
         metadata={session?.peer.metadata}
         isLinkMode={isLinkMode}
