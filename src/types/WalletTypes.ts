@@ -5,7 +5,8 @@
  */
 export enum WalletType {
   SOFTWARE = 'software',
-  SATOCHIP = 'satochip'
+  SATOCHIP = 'satochip',
+  SATODIME = 'satodime',
 }
 
 export interface WalletInfo {
@@ -23,6 +24,34 @@ export interface SatochipInfo extends WalletInfo {
   derivationPath: string;
   masterXfp: string; // 8 hex character master seed fingerprint
   xpub: string;
+}
+
+/** Satodime vault state, as reported by the card (same values as the applet). */
+export enum SatodimeVaultState {
+  UNINITIALIZED = 0,
+  SEALED = 1,
+  UNSEALED = 2,
+}
+
+/**
+ * One Satodime vault (key slot) used as an account.
+ * Public data only: the card unlock secret is kept in the secure keychain,
+ * keyed by the authentikey (see src/utils/SecretStore.ts).
+ */
+export interface SatodimeInfo extends WalletInfo {
+  type: WalletType.SATODIME;
+  /** Card authentikey, compressed public key (33 bytes hex, no 0x). Identifies the card. */
+  authentikey: string;
+  /** Vault (key slot) index on the card, 0..2. */
+  vaultIndex: number;
+  /** Vault public key, uncompressed (65 bytes hex, no 0x). */
+  pubkey: string;
+  /** Raw SLIP-44 value stored on the card (uint32), including the mainnet bit. */
+  slip44: number;
+  /** Vault state when last read from the card. */
+  vaultState: SatodimeVaultState;
+  /** Card label at import time, if any. */
+  cardLabel?: string;
 }
 
 export interface SoftwareWalletInfo extends WalletInfo {
@@ -54,6 +83,13 @@ export interface IWalletProvider {
   signTransaction(transaction: any): Promise<string>;
   isAvailable(): Promise<boolean>;
   getWalletInfo(): WalletInfo;
+}
+
+// Satodime specific interface
+export interface ISatodimeWallet extends IWalletProvider {
+  readonly type: WalletType.SATODIME;
+  readonly satodimeInfo: SatodimeInfo;
+  getWalletInfo(): SatodimeInfo;
 }
 
 // Satochip specific interface

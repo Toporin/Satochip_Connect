@@ -4482,6 +4482,7 @@ __metadata:
     react-native-dialog: 9.3.0
     react-native-gesture-handler: 2.28.0
     react-native-get-random-values: 1.11.0
+    react-native-keychain: ^11.0.0
     react-native-mmkv: 3.3.3
     react-native-modal: 14.0.0-rc.1
     react-native-nfc-manager: ^3.17.2
@@ -4498,7 +4499,7 @@ __metadata:
     react-native-vision-camera: 4.7.2
     react-test-renderer: 19.1.1
     readable-stream: 1.0.33
-    satochip-react-native: "github:Toporin/satochip-react-native#dc934769163d591a2cf43f96fef18af564af0894"
+    satochip-react-native: "portal:../satochip-react-native-satodime"
     stream-browserify: 3.0.0
     typescript: ^5.8.3
     valtio: 2.1.8
@@ -11050,6 +11051,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-native-keychain@npm:^11.0.0":
+  version: 11.0.0
+  resolution: "react-native-keychain@npm:11.0.0"
+  peerDependencies:
+    react: ">=19.1.1"
+    react-native: ">=0.82.0"
+  checksum: d4a614e19061871eb3406eaf0d6551425a281c0386644187e9e626d0e7cb4ace3c242883809a1fd8fba6fdf27cb3b0655578c5c1c0b5b28998a5dcb329a747d4
+  languageName: node
+  linkType: hard
+
 "react-native-mmkv@npm:3.3.3":
   version: 3.3.3
   resolution: "react-native-mmkv@npm:3.3.3"
@@ -11711,9 +11722,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"satochip-react-native@github:Toporin/satochip-react-native#dc934769163d591a2cf43f96fef18af564af0894":
-  version: 0.1.7
-  resolution: "satochip-react-native@https://github.com/Toporin/satochip-react-native.git#commit=dc934769163d591a2cf43f96fef18af564af0894"
+"satochip-react-native@portal:../satochip-react-native-satodime::locator=RNWeb3Wallet%40workspace%3A.":
+  version: 0.0.0-use.local
+  resolution: "satochip-react-native@portal:../satochip-react-native-satodime::locator=RNWeb3Wallet%40workspace%3A."
   dependencies:
     asn1js: ^3.0.6
     bech32: 2.0.0
@@ -11725,13 +11736,11 @@ __metadata:
     js-sha256: 0.9.0
     ripemd160: 2.0.2
     secp256k1: 4.0.3
-    typescript: 4.7.4
   peerDependencies:
     react-native: ">=0.60.0"
     react-native-nfc-manager: ">=3.13.2"
-  checksum: c1338e8fd08c6844133ee34b6d7fa92471e5026788669bb29f1c045876306476b3eb0b2dc791126e132be6820a76a649f85f2769a73e968ea590eda741578660
   languageName: node
-  linkType: hard
+  linkType: soft
 
 "sax@npm:>=0.6.0":
   version: 1.4.4
@@ -12815,16 +12824,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@npm:4.7.4":
-  version: 4.7.4
-  resolution: "typescript@npm:4.7.4"
-  bin:
-    tsc: bin/tsc
-    tsserver: bin/tsserver
-  checksum: 5750181b1cd7e6482c4195825547e70f944114fb47e58e4aa7553e62f11b3f3173766aef9c281783edfd881f7b8299cf35e3ca8caebe73d8464528c907a164df
-  languageName: node
-  linkType: hard
-
 "typescript@npm:^5.8.3":
   version: 5.9.3
   resolution: "typescript@npm:5.9.3"
@@ -12832,16 +12831,6 @@ __metadata:
     tsc: bin/tsc
     tsserver: bin/tsserver
   checksum: 0d0ffb84f2cd072c3e164c79a2e5a1a1f4f168e84cb2882ff8967b92afe1def6c2a91f6838fb58b168428f9458c57a2ba06a6737711fdd87a256bbe83e9a217f
-  languageName: node
-  linkType: hard
-
-"typescript@patch:typescript@4.7.4#~builtin<compat/typescript>":
-  version: 4.7.4
-  resolution: "typescript@patch:typescript@npm%3A4.7.4#~builtin<compat/typescript>::version=4.7.4&hash=65a307"
-  bin:
-    tsc: bin/tsc
-    tsserver: bin/tsserver
-  checksum: 9096d8f6c16cb80ef3bf96fcbbd055bf1c4a43bd14f3b7be45a9fbe7ada46ec977f604d5feed3263b4f2aa7d4c7477ce5f9cd87de0d6feedec69a983f3a4f93e
   languageName: node
   linkType: hard
 
