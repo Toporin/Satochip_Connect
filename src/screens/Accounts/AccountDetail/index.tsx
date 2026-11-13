@@ -323,16 +323,10 @@ export default function AccountDetail({ route, navigation }: Props) {
   const handleExploreClick = async () => {
     const url = `https://blockscan.com/address/${walletInfo.address}`;
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        Toast.show({
-          type: 'error',
-          text1: 'Cannot open URL',
-          text2: 'Browser not available',
-        });
-      }
+      // Open directly: on Android 11+ canOpenURL() returns false for https
+      // links unless <queries> are declared in the manifest, even when a
+      // browser is installed. openURL() rejects if nothing can handle it.
+      await Linking.openURL(url);
     } catch (error) {
       console.error('Failed to open URL:', error);
       Toast.show({

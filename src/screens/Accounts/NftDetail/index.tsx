@@ -105,12 +105,9 @@ export default function NftDetail({ route, navigation }: Props) {
 
   const openUrl = async (url: string, label: string) => {
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        Toast.show({ type: 'error', text1: `Cannot open ${label}` });
-      }
+      // Open directly: on Android 11+ canOpenURL() returns false for https
+      // links without <queries> in the manifest. openURL() rejects on failure.
+      await Linking.openURL(url);
     } catch {
       Toast.show({ type: 'error', text1: `Failed to open ${label}` });
     }
