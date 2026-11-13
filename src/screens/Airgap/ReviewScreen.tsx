@@ -1,6 +1,8 @@
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {Alert, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {SatochipCard, SatodimeCard} from 'satochip-react-native';
+import useRequestWallet from '@/hooks/useRequestWallet';
+import {AccountSelector} from '@/components/Modal/AccountSelector';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {RootStackScreenProps} from '@/utils/TypesUtil';
@@ -17,7 +19,6 @@ import {Addresses} from '@/components/Modal/Addresses';
 import {Message} from '@/components/Modal/Message';
 import {PinModal} from '@/components/Modal/PinModal';
 import NfcPrompt from '@/components/NfcPromptAndroid';
-import useSatochipModal from '@/hooks/useSatochipModal';
 import {
   AirgapAccount,
   AirgapError,
@@ -65,13 +66,12 @@ export default function ReviewScreen({route, navigation}: Props) {
 
   const chain = parsed?.chainId ? PresetsUtil.getChainData(`eip155:${parsed.chainId}`) : undefined;
 
-  const wallet = parsed ? SettingsStore.getWallet(parsed.account.id) : undefined;
+  // Accounts holding the request key share its address: a software account
+  // restored from a Satochip seed matches the card account (same xfp and path).
+  // The user picks the signer; the signature is the same either way.
+  const {candidates, wallet, needsChoice, selectWallet, card, withModal, nfcVisible, closeNfc} =
+    useRequestWallet(parsed?.account.address);
   const walletType = wallet?.type;
-  // NFC card for hardware accounts (Satodime vaults use a SatodimeCard, no PIN)
-  const card = useRef<SatochipCard | SatodimeCard>(
-    walletType === WalletType.SATODIME ? new SatodimeCard() : new SatochipCard(),
-  ).current;
-  const {withModal, nfcVisible, closeNfc} = useSatochipModal(card);
 
   /** Run a card operation with the NFC prompt. */
   const withCard = useCallback(
@@ -206,6 +206,9 @@ export default function ReviewScreen({route, navigation}: Props) {
 
         {chain ? <Chains chains={[chain]} /> : null}
         <Addresses addresses={[parsed.account.address]} />
+        {candidates.length > 1 && (
+          <AccountSelector wallets={candidates} selectedId={wallet?.id} onSelect={selectWallet} />
+        )}
 
         <View style={[styles.card, {backgroundColor: Theme['bg-150']}]}>
           <Field label="Account" value={`${parsed.account.name} (${parsed.derivationPath})`} />
@@ -242,6 +245,7 @@ export default function ReviewScreen({route, navigation}: Props) {
         <ActionButton
           style={styles.halfButton}
           loading={signing}
+          disabled={needsChoice || !wallet}
           onPress={onApprove}>
           {signLabel}
         </ActionButton>
