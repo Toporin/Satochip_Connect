@@ -1,5 +1,5 @@
 import { useSnapshot } from 'valtio';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { SignClientTypes } from '@walletconnect/types';
 
@@ -22,11 +22,10 @@ import { RequestModal } from './RequestModal';
 import { Chains } from '@/components/Modal/Chains';
 import { Addresses } from '@/components/Modal/Addresses';
 import { PresetsUtil } from '@/utils/PresetsUtil';
-import { SatochipCard, SatodimeCard } from 'satochip-react-native';
-import useSatochipModal from '@/hooks/useSatochipModal.ts';
+import useRequestWallet from '@/hooks/useRequestWallet';
+import { AccountSelector } from '@/components/Modal/AccountSelector';
 import { PinModal } from '@/components/Modal/PinModal.tsx';
 import NfcPrompt from '@/components/NfcPromptAndroid.tsx';
-import SettingsStore from '@/store/SettingsStore.ts';
 import { WalletType } from '@/types/WalletTypes.ts';
 
 export default function SessionSignModal() {
@@ -52,13 +51,19 @@ export default function SessionSignModal() {
   // Get message, convert it to UTF8 string if it is valid hex
   const message = getSignParamsMessage(request.params);
   const address = getEIP155AddressesFromParams(params);
-  const wallet = SettingsStore.getWalletByAddress(address);
+  // Account that signs: several accounts can share this address (e.g. a software
+  // account restored from a Satochip seed), the user then picks one.
+  const {
+    candidates,
+    wallet,
+    needsChoice,
+    selectWallet,
+    card,
+    withModal,
+    nfcVisible,
+    closeNfc,
+  } = useRequestWallet(address);
   const walletType = wallet?.type;
-  // NFC card for hardware accounts (Satodime vaults use a SatodimeCard, no PIN)
-  const card = useRef<SatochipCard | SatodimeCard>(
-    walletType === WalletType.SATODIME ? new SatodimeCard() : new SatochipCard(),
-  ).current;
-  const { withModal, nfcVisible, closeNfc } = useSatochipModal(card);
 
   // Handle the actual approval after PIN is entered
   const performApproval = useCallback(
@@ -73,6 +78,7 @@ export default function SessionSignModal() {
             card,
             withModal,
             closeNfc,
+            wallet,
           );
 
           await walletKit.respondSessionRequest({
@@ -102,7 +108,7 @@ export default function SessionSignModal() {
         }
       }
     },
-    [requestEvent, peerMetadata, topic, isLinkMode, card, withModal, closeNfc],
+    [requestEvent, peerMetadata, topic, isLinkMode, card, withModal, closeNfc, wallet],
   );
 
   // Handle PIN submission
@@ -121,6 +127,10 @@ export default function SessionSignModal() {
 
   // Handle approve action - shows PIN modal first for Satochip
   const onApprove = useCallback(async () => {
+    if (needsChoice) {
+      Alert.alert('Choose an account', 'Several accounts use this address. Select the account to sign with.');
+      return;
+    }
     if (walletType === WalletType.SATOCHIP) {
       setShowPinModal(true);
     } else if (walletType === WalletType.SOFTWARE) {
@@ -136,7 +146,7 @@ export default function SessionSignModal() {
     } else {
       await performApproval('');
     }
-  }, [performApproval, wallet, walletType]);
+  }, [performApproval, wallet, walletType, needsChoice]);
 
   // Handle reject action
   const onReject = useCallback(async () => {
@@ -183,6 +193,9 @@ export default function SessionSignModal() {
         <View style={styles.container}>
           {chain ? <Chains chains={[chain]} /> : null}
           {address ? <Addresses addresses={[address]} /> : null}
+          {candidates.length > 1 ? (
+            <AccountSelector wallets={candidates} selectedId={wallet?.id} onSelect={selectWallet} />
+          ) : null}
           <Methods methods={[method]} />
           <Message message={message} />
         </View>

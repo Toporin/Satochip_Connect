@@ -35,6 +35,43 @@ type RequestEventArgs = Omit<
 >;
 
 /**
+ * Account that signs for `address`.
+ *
+ * Several accounts can share an address (e.g. a software account restored from
+ * the seed of a Satochip card). Picking the first match would sign with the
+ * wrong account type (card PIN used as a password), so when the address is
+ * ambiguous the caller must say which account to use.
+ */
+export function resolveSigningWallet(
+  address: string,
+  signingWallet?: IWalletProvider,
+): IWalletProvider {
+  if (signingWallet) {
+    if (signingWallet.address.toLowerCase() !== address.toLowerCase()) {
+      throw new WalletError(
+        WalletErrorType.INVALID_ADDRESS,
+        `Selected account does not match request address: ${address}`,
+      );
+    }
+    return signingWallet;
+  }
+  const candidates = SettingsStore.getWalletsByAddress(address);
+  if (candidates.length === 0) {
+    throw new WalletError(
+      WalletErrorType.DEVICE_NOT_FOUND,
+      `No wallet found for address: ${address}`,
+    );
+  }
+  if (candidates.length > 1) {
+    throw new WalletError(
+      WalletErrorType.WALLET_NOT_SET,
+      `Several accounts use address ${address}. Choose the account to sign with.`,
+    );
+  }
+  return candidates[0];
+}
+
+/**
  * Enhanced approve function that handles both software and hardware wallets
  */
 export async function approveEIP155RequestEnhanced(
@@ -43,6 +80,7 @@ export async function approveEIP155RequestEnhanced(
   card: SatochipCard | SatodimeCard,
   withModal: any,
   closeNfc: any,
+  signingWallet?: IWalletProvider, // account chosen by the caller (several accounts can share an address)
 ) {
 
   const { params, id } = requestEvent;
@@ -59,13 +97,7 @@ export async function approveEIP155RequestEnhanced(
   let wallet: IWalletProvider | undefined;
   try {
 
-    wallet = SettingsStore.getWalletByAddress(address);
-    if (!wallet) {
-      throw new WalletError(
-        WalletErrorType.DEVICE_NOT_FOUND,
-        `No wallet found for address: ${address}`,
-      );
-    }
+    wallet = resolveSigningWallet(address, signingWallet);
 
     // for software wallet, decrypt sensitive info using user credentials
     const walletType = wallet.type;

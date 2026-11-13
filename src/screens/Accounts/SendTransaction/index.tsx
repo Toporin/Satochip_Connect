@@ -340,7 +340,8 @@ const SendTransactionScreen: React.FC = () => {
         pin,
         card,
         withModal,
-        closeNfc
+        closeNfc,
+        wallet, // sign with this account, not the first one sharing its address
       );
 
       // Extract transaction hash
