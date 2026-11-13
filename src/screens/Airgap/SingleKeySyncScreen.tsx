@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {ScrollView, StyleSheet, Switch, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
@@ -91,6 +91,14 @@ export default function SingleKeySyncScreen({route, navigation}: Props) {
     },
     [wallet],
   );
+
+  // Mnemonic software accounts pair with crypto-hdkey (xpub), like Satochip
+  const isMnemonicSoftware = wallet instanceof EIP155SoftwareWallet && wallet.getWalletInfo().keyType === 'mnemonic';
+  useEffect(() => {
+    if (isMnemonicSoftware) {
+      navigation.replace('AirgapSync', {accountId});
+    }
+  }, [accountId, isMnemonicSoftware, navigation]);
 
   const needsSoftwareUnlock = wallet instanceof EIP155SoftwareWallet && !source.publicKey;
 

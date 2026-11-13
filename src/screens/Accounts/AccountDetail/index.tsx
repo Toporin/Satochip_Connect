@@ -561,7 +561,7 @@ export default function AccountDetail({ route, navigation }: Props) {
             </Text>
             <TouchableOpacity
               style={[styles.actionButton, styles.airgapButton, { backgroundColor: Theme['accent-100'] }]}
-              onPress={() => navigation.navigate('AirgapSingleKeySync', { accountId })}
+              onPress={() => navigation.navigate('AirgapSync', { accountId })}
               activeOpacity={0.7}>
               <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
                 Connect to browser extension (QR)
