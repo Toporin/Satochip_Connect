@@ -1,6 +1,13 @@
 # QR pairing for single-key accounts (ERC-4527 `crypto-account`)
 
-Satodime vault accounts and software accounts each hold **one** key pair.
+Satodime vault accounts (and software accounts imported from a raw private
+key) each hold **one** key pair.
+
+> Software accounts created from a BIP39 mnemonic use `m/44'/60'/0'/0/i`, like
+> Satochip: they pair with `ur:crypto-hdkey` (account-level xpub at
+> `m/44'/60'/0'` + master fingerprint, recorded when the account is created or
+> first unlocked) and are routed by fingerprint + full path. Only Satodime
+> vaults and private-key software accounts use the scheme below.
 They cannot be shared with browser extensions as an xpub (`ur:crypto-hdkey`):
 MetaMask and Rabby always derive child keys from an xpub, and a child can never
 equal its parent. They are shared as `ur:crypto-account` instead ("pubkey mode").
