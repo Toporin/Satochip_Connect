@@ -202,3 +202,33 @@ describe('Keystone (@keystonehq/base-eth-keyring) with crypto-hdkey', () => {
     expect(ethers.utils.verifyMessage('hello', sig)).toBe(soft2.address);
   });
 });
+
+describe('BIP39 passphrase', () => {
+  test('the account key is derived at derivationPath from the passphrase seed', () => {
+    const path = "m/44'/60'/0'/0/1";
+    const root = ethers.utils.HDNode.fromMnemonic(TEST_MNEMONIC, 'secret');
+    const expected = root.derivePath(path);
+    const info: SoftwareWalletInfo = {
+      id: 'pp', name: 'PP', type: WalletType.SOFTWARE, address: expected.address, blockchain: 'eip155', encryptedBlob: '',
+    };
+    // threw "Address mismatch" before: the root key was used instead of the derived key
+    const wallet = new EIP155SoftwareWallet(info, { keyType: 'mnemonic', mnemonic: TEST_MNEMONIC, passphrase: 'secret', derivationPath: path });
+    expect(wallet.signDigest(ethers.utils.hashMessage('x')).r).toMatch(/^0x/);
+    expect(wallet.getWalletInfo().masterXfp).toBe(root.fingerprint.slice(2).toUpperCase());
+    expect(wallet.getWalletInfo().xpub).toBe(root.derivePath("m/44'/60'/0'").neuter().extendedKey);
+    expect(wallet.getMnemonic()).toBe(TEST_MNEMONIC);
+  });
+
+  test('without passphrase the key is unchanged (Wallet.fromMnemonic)', () => {
+    const path = "m/44'/60'/0'/0/4";
+    const expected = ethers.Wallet.fromMnemonic(TEST_MNEMONIC, path);
+    const wallet = new EIP155SoftwareWallet(
+      { id: 'np', name: 'NP', type: WalletType.SOFTWARE, address: expected.address, blockchain: 'eip155', encryptedBlob: '' },
+      { keyType: 'mnemonic', mnemonic: TEST_MNEMONIC, passphrase: '', derivationPath: path },
+    );
+    const digest = ethers.utils.hashMessage('y');
+    const { r, s } = wallet.signDigest(digest);
+    expect(r).toBe(expected._signingKey().signDigest(digest).r);
+    expect(s).toBe(expected._signingKey().signDigest(digest).s);
+  });
+});

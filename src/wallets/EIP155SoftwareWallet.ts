@@ -61,17 +61,17 @@ export class EIP155SoftwareWallet implements ISoftwareWallet {
       case 'mnemonic':
         if (!this.sensitiveInfo.mnemonic) throw new Error('Mnemonic required');
 
-        if (this.sensitiveInfo.passphrase) {
-          const hdNode = utils.HDNode.fromMnemonic(
-            this.sensitiveInfo.mnemonic,
-            this.sensitiveInfo.passphrase,
-          );
-          this.wallet = new Wallet(hdNode);
-        } else {
-          this.wallet = Wallet.fromMnemonic(
-            this.sensitiveInfo.mnemonic,
-            this.sensitiveInfo.derivationPath || "m/44'/60'/0'/0/0",
-          );
+        {
+          // Derive the account key at derivationPath from the BIP39 seed,
+          // including the optional passphrase. (Previously a passphrase made
+          // the wallet use the root key, ignoring the derivation path.)
+          // The wallet is built from the derived private key: ethers'
+          // Wallet(HDNode) would re-derive from the phrase without the
+          // passphrase and reject the key.
+          const node = utils.HDNode
+            .fromMnemonic(this.sensitiveInfo.mnemonic, this.sensitiveInfo.passphrase || undefined)
+            .derivePath(this.sensitiveInfo.derivationPath || "m/44'/60'/0'/0/0");
+          this.wallet = new Wallet(node.privateKey);
         }
         break;
 
@@ -112,11 +112,10 @@ export class EIP155SoftwareWallet implements ISoftwareWallet {
     if (
       sensitive.keyType === 'mnemonic' &&
       sensitive.mnemonic &&
-      !sensitive.passphrase && // passphrase accounts are not created by the app (see setupWallet)
       /^m\/44'\/60'\/0'\/0\/\d+$/.test(path) &&
       !info.xpub
     ) {
-      const root = utils.HDNode.fromMnemonic(sensitive.mnemonic);
+      const root = utils.HDNode.fromMnemonic(sensitive.mnemonic, sensitive.passphrase || undefined);
       const derived = root.derivePath(path);
       if (derived.address !== this.address) {
         return; // never publish an xpub that does not derive this account
@@ -194,7 +193,10 @@ export class EIP155SoftwareWallet implements ISoftwareWallet {
     if (!this.wallet) {
       throw new WalletError(WalletErrorType.WALLET_NOT_SET, "Wallet not set");
     }
-    return this.wallet.mnemonic.phrase;
+    if (!this.sensitiveInfo?.mnemonic) {
+      throw new WalletError(WalletErrorType.WALLET_NOT_SET, 'No mnemonic for this account');
+    }
+    return this.sensitiveInfo.mnemonic;
   }
 
   public exportPrivateKey(): string {
