@@ -71,7 +71,7 @@
     "react-native-toast-message": "2.3.3",
     "react-native-vision-camera": "4.7.2",
     "readable-stream": "1.0.33",
-    "satochip-react-native": "portal:../satochip-react-native-satodime",
+    "satochip-react-native": "github:Toporin/satochip-react-native#5d924bb3cb98ee8d4855dc3c28016a098912ebbc",
     "stream-browserify": "3.0.0",
     "valtio": "2.1.8"
   },
