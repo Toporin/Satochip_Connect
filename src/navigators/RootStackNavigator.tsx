@@ -14,6 +14,7 @@ import AirgapSync from '@/screens/Airgap/SyncScreen';
 import AirgapReview from '@/screens/Airgap/ReviewScreen';
 import AirgapSignature from '@/screens/Airgap/SignatureScreen';
 import AirgapSingleKeySync from '@/screens/Airgap/SingleKeySyncScreen';
+import AirgapHelperError from '@/screens/Airgap/HelperErrorScreen';
 
 const StackNavigator = createStackNavigator<RootStackParamList>();
 
@@ -114,6 +115,16 @@ export function RootStackNavigator() {
           options={{
             headerShown: true,
             title: 'Connect browser extension',
+            headerBackTitle: '',
+            headerTintColor: Theme['fg-100'],
+          }}
+        />
+        <StackNavigator.Screen
+          name="AirgapHelperError"
+          component={AirgapHelperError}
+          options={{
+            headerShown: true,
+            title: 'Request rejected',
             headerBackTitle: '',
             headerTintColor: Theme['fg-100'],
           }}
