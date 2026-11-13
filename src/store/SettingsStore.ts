@@ -206,6 +206,17 @@ const SettingsStore = {
     return undefined;
   },
 
+  /**
+   * All wallets with this address. Several accounts can share an address,
+   * e.g. a software account restored from the same seed as a Satochip card.
+   */
+  getWalletsByAddress(address: string): IWalletProvider[] {
+    const target = address.toLowerCase();
+    return Array.from(state.wallets.values()).filter(
+      wallet => wallet.address.toLowerCase() === target,
+    );
+  },
+
   getAllWallets(): IWalletProvider[] {
     return Array.from(state.wallets.values());
   },
@@ -221,6 +232,14 @@ const SettingsStore = {
   getSatochipWallets(): ISatochipWallet[] {
     return Array.from(state.wallets.values())
       .filter(wallet => wallet.type === WalletType.SATOCHIP) as ISatochipWallet[];
+  },
+
+  /**
+   * Persist software public keys recorded on unlock (public data, needed for
+   * QR pairing). Call after unlocking a software wallet.
+   */
+  rememberSoftwarePublicKeys() {
+    this.saveSoftwareWallets();
   },
 
   getSatodimeWallets(): ISatodimeWallet[] {

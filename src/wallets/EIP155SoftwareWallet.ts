@@ -61,17 +61,17 @@ export class EIP155SoftwareWallet implements ISoftwareWallet {
       case 'mnemonic':
         if (!this.sensitiveInfo.mnemonic) throw new Error('Mnemonic required');
 
-        if (this.sensitiveInfo.passphrase) {
-          const hdNode = utils.HDNode.fromMnemonic(
-            this.sensitiveInfo.mnemonic,
-            this.sensitiveInfo.passphrase,
-          );
-          this.wallet = new Wallet(hdNode);
-        } else {
-          this.wallet = Wallet.fromMnemonic(
-            this.sensitiveInfo.mnemonic,
-            this.sensitiveInfo.derivationPath || "m/44'/60'/0'/0/0",
-          );
+        {
+          // Derive the account key at derivationPath from the BIP39 seed,
+          // including the optional passphrase. (Previously a passphrase made
+          // the wallet use the root key, ignoring the derivation path.)
+          // The wallet is built from the derived private key: ethers'
+          // Wallet(HDNode) would re-derive from the phrase without the
+          // passphrase and reject the key.
+          const node = utils.HDNode
+            .fromMnemonic(this.sensitiveInfo.mnemonic, this.sensitiveInfo.passphrase || undefined)
+            .derivePath(this.sensitiveInfo.derivationPath || "m/44'/60'/0'/0/0");
+          this.wallet = new Wallet(node.privateKey);
         }
         break;
 
@@ -90,6 +90,57 @@ export class EIP155SoftwareWallet implements ISoftwareWallet {
         `Address mismatch during wallet unlock: expected ${this.address} but got ${this.wallet.address}`,
       );
     }
+
+    this.recordPairingData();
+  }
+
+  /**
+   * Record the public data used for QR pairing (persisted by the caller):
+   * public key, and for mnemonic accounts the master fingerprint and the
+   * account-level xpub at m/44'/60'/0' (same layout as Satochip accounts).
+   */
+  private recordPairingData() {
+    const info = this.softwareWalletInfo;
+    const sensitive = this.sensitiveInfo;
+    if (!this.wallet || !sensitive) {
+      return;
+    }
+    info.keyType = sensitive.keyType;
+    info.publicKey = utils.computePublicKey(this.wallet.publicKey, true).slice(2);
+
+    const path = sensitive.derivationPath || "m/44'/60'/0'/0/0";
+    if (
+      sensitive.keyType === 'mnemonic' &&
+      sensitive.mnemonic &&
+      /^m\/44'\/60'\/0'\/0\/\d+$/.test(path) &&
+      !info.xpub
+    ) {
+      const root = utils.HDNode.fromMnemonic(sensitive.mnemonic, sensitive.passphrase || undefined);
+      const derived = root.derivePath(path);
+      if (derived.address !== this.address) {
+        return; // never publish an xpub that does not derive this account
+      }
+      info.derivationPath = path;
+      info.masterXfp = root.fingerprint.slice(2).toUpperCase();
+      info.xpub = root.derivePath("m/44'/60'/0'").neuter().extendedKey;
+    }
+  }
+
+  /** Compressed public key (hex, no 0x), if it was already recorded. */
+  public getPublicKey(): string | undefined {
+    return this.softwareWalletInfo.publicKey;
+  }
+
+  /**
+   * Sign a 32-byte digest (ERC-4527 QR requests). The wallet must be unlocked.
+   * Returns r and s (low-S); v is computed by the caller.
+   */
+  public signDigest(digest: string): { r: string; s: string } {
+    if (!this.wallet) {
+      throw new WalletError(WalletErrorType.WALLET_NOT_SET, 'Wallet not set');
+    }
+    const signature = this.wallet._signingKey().signDigest(digest);
+    return { r: signature.r, s: signature.s };
   }
 
   public getAddress(): string {
@@ -142,7 +193,10 @@ export class EIP155SoftwareWallet implements ISoftwareWallet {
     if (!this.wallet) {
       throw new WalletError(WalletErrorType.WALLET_NOT_SET, "Wallet not set");
     }
-    return this.wallet.mnemonic.phrase;
+    if (!this.sensitiveInfo?.mnemonic) {
+      throw new WalletError(WalletErrorType.WALLET_NOT_SET, 'No mnemonic for this account');
+    }
+    return this.sensitiveInfo.mnemonic;
   }
 
   public exportPrivateKey(): string {

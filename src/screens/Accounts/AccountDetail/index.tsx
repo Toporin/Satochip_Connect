@@ -536,10 +536,35 @@ export default function AccountDetail({ route, navigation }: Props) {
             )}
             <TouchableOpacity
               style={[styles.actionButton, styles.airgapButton, { backgroundColor: Theme['accent-100'] }]}
+              onPress={() => navigation.navigate('AirgapSingleKeySync', { accountId })}
+              activeOpacity={0.7}>
+              <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
+                Connect to browser extension (QR)
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.airgapButton, { backgroundColor: Theme['accent-100'] }]}
               onPress={rescanSatodimeVault}
               activeOpacity={0.7}>
               <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
                 Re-scan card
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Software account: QR pairing with browser extensions */}
+        {wallet.type === WalletType.SOFTWARE && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: Theme['fg-100'] }]}>
+              Browser extension
+            </Text>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.airgapButton, { backgroundColor: Theme['accent-100'] }]}
+              onPress={() => navigation.navigate('AirgapSync', { accountId })}
+              activeOpacity={0.7}>
+              <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
+                Connect to browser extension (QR)
               </Text>
             </TouchableOpacity>
           </View>

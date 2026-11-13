@@ -14,7 +14,8 @@ import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import SvgChevronRight from '@/assets/ChevronRight';
 import {RootStackScreenProps} from '@/utils/TypesUtil';
 import {isURText, URScanner} from '@/airgap/urCodec';
-import {ETH_SIGN_REQUEST_UR_TYPE} from '@/airgap/signRequest';
+import {ETH_SIGN_REQUEST_UR_TYPE, HelperAddressError, parseSignRequestUR} from '@/airgap/signRequest';
+import {getAirgapAccounts} from '@/airgap/storeAccounts';
 import styles from './styles';
 
 type Props = RootStackScreenProps<'Scan'>;
@@ -64,6 +65,23 @@ export default function Scan({navigation}: Props) {
         return;
       }
       console.info(`[Airgap] eth-sign-request scanned (${ur.cbor.length} bytes)`);
+      // Route right after decoding: a request for a helper key of a single-key
+      // account stops here, before the review screen and any PIN/password/NFC prompt.
+      try {
+        parseSignRequestUR(ur, getAirgapAccounts());
+      } catch (error) {
+        if (error instanceof HelperAddressError) {
+          console.warn(`[Airgap] request for helper address #${error.helperIndex} rejected`);
+          navigation.replace('AirgapHelperError', {
+            accountId: error.accountId,
+            helperIndex: error.helperIndex,
+            helperAddress: error.helperAddress,
+            primaryAddress: error.primaryAddress,
+          });
+          return;
+        }
+        // other errors are explained on the review screen (nothing is signed there)
+      }
       navigation.replace('AirgapReview', {
         cborHex: ur.cbor.toString('hex'),
         urType: ur.type,

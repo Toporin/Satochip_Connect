@@ -57,6 +57,22 @@ export interface SatodimeInfo extends WalletInfo {
 export interface SoftwareWalletInfo extends WalletInfo {
   type: WalletType.SOFTWARE;
   encryptedBlob: string;     // encrypted data
+  /*
+   * Public data recorded the first time the key material is available
+   * (creation or unlock), for QR pairing with browser extensions:
+   * - mnemonic accounts pair with ur:crypto-hdkey (xpub at m/44'/60'/0', like Satochip)
+   * - private-key accounts pair with ur:crypto-account (single key)
+   */
+  /** Key material type, known once unlocked. */
+  keyType?: 'mnemonic' | 'privateKey';
+  /** Compressed public key of the account (33 bytes hex, no 0x). */
+  publicKey?: string;
+  /** Mnemonic accounts: full derivation path, e.g. m/44'/60'/0'/0/0. */
+  derivationPath?: string;
+  /** Mnemonic accounts: master fingerprint (8 uppercase hex, as SatochipInfo.masterXfp). */
+  masterXfp?: string;
+  /** Mnemonic accounts: account-level xpub at m/44'/60'/0'. */
+  xpub?: string;
   //provider?: ethers.providers.Provider;
 }
 
