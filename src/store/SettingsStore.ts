@@ -223,6 +223,14 @@ const SettingsStore = {
       .filter(wallet => wallet.type === WalletType.SATOCHIP) as ISatochipWallet[];
   },
 
+  /**
+   * Persist software public keys recorded on unlock (public data, needed for
+   * QR pairing). Call after unlocking a software wallet.
+   */
+  rememberSoftwarePublicKeys() {
+    this.saveSoftwareWallets();
+  },
+
   getSatodimeWallets(): ISatodimeWallet[] {
     return Array.from(state.wallets.values())
       .filter(wallet => wallet.type === WalletType.SATODIME) as ISatodimeWallet[];

@@ -90,6 +90,28 @@ export class EIP155SoftwareWallet implements ISoftwareWallet {
         `Address mismatch during wallet unlock: expected ${this.address} but got ${this.wallet.address}`,
       );
     }
+
+    // record the public key (public data) for QR pairing; persisted by the caller
+    if (!this.softwareWalletInfo.publicKey) {
+      this.softwareWalletInfo.publicKey = utils.computePublicKey(this.wallet.publicKey, true).slice(2);
+    }
+  }
+
+  /** Compressed public key (hex, no 0x), if it was already recorded. */
+  public getPublicKey(): string | undefined {
+    return this.softwareWalletInfo.publicKey;
+  }
+
+  /**
+   * Sign a 32-byte digest (ERC-4527 QR requests). The wallet must be unlocked.
+   * Returns r and s (low-S); v is computed by the caller.
+   */
+  public signDigest(digest: string): { r: string; s: string } {
+    if (!this.wallet) {
+      throw new WalletError(WalletErrorType.WALLET_NOT_SET, 'Wallet not set');
+    }
+    const signature = this.wallet._signingKey().signDigest(digest);
+    return { r: signature.r, s: signature.s };
   }
 
   public getAddress(): string {

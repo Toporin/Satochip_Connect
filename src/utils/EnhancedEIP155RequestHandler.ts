@@ -75,6 +75,8 @@ export async function approveEIP155RequestEnhanced(
     ) {
       // unlock wallet with user provided password
       await (wallet as EIP155SoftwareWallet).unlockWallet(pin);
+      // keep the public key recorded at unlock (used for QR pairing)
+      SettingsStore.rememberSoftwarePublicKeys();
     }
 
     // Handle different signing methods

@@ -1,13 +1,15 @@
 import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {Alert, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {SatochipCard} from 'satochip-react-native';
+import {SatochipCard, SatodimeCard} from 'satochip-react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {RootStackScreenProps} from '@/utils/TypesUtil';
 import {useTheme} from '@/hooks/useTheme';
 import SettingsStore from '@/store/SettingsStore';
-import {SatochipInfo, WalletError} from '@/types/WalletTypes';
+import {SatodimeInfo, WalletError, WalletType} from '@/types/WalletTypes';
 import {SatochipWallet} from '@/wallets/satochip/SatochipWallet';
+import {EIP155SoftwareWallet} from '@/wallets/EIP155SoftwareWallet';
+import {signDigestWithSatodime} from '@/wallets/satodime/SatodimeClient';
 import {PresetsUtil} from '@/utils/PresetsUtil';
 import {ActionButton} from '@/components/ActionButton';
 import {Chains} from '@/components/Modal/Chains';
@@ -17,12 +19,14 @@ import {PinModal} from '@/components/Modal/PinModal';
 import NfcPrompt from '@/components/NfcPromptAndroid';
 import useSatochipModal from '@/hooks/useSatochipModal';
 import {
+  AirgapAccount,
   AirgapError,
   ParsedSignRequest,
   parseSignRequestUR,
 } from '@/airgap/signRequest';
+import {getAirgapAccounts} from '@/airgap/storeAccounts';
 import {buildEthSignature} from '@/airgap/signatureResponse';
-import type {AirgapSignature} from '@/airgap/signing';
+import {AirgapSignature, finalizeRawSignature, finalizeSignature} from '@/airgap/signing';
 
 type Props = RootStackScreenProps<'AirgapReview'>;
 
@@ -40,16 +44,14 @@ export default function ReviewScreen({route, navigation}: Props) {
 
   const [showPinModal, setShowPinModal] = useState(false);
   const [signing, setSigning] = useState(false);
-  const card = useRef(new SatochipCard()).current;
-  const {withModal, nfcVisible, closeNfc} = useSatochipModal(card);
 
   const {parsed, error} = useMemo((): {
-    parsed?: ParsedSignRequest<SatochipInfo>;
+    parsed?: ParsedSignRequest<AirgapAccount>;
     error?: string;
   } => {
     try {
-      const accounts = SettingsStore.getSatochipWallets().map(w => w.getWalletInfo());
-      const p = parseSignRequestUR({type: urType, cbor: Buffer.from(cborHex, 'hex')}, accounts);
+      // Satochip accounts (xfp + path) and single-key accounts (Satodime, software)
+      const p = parseSignRequestUR({type: urType, cbor: Buffer.from(cborHex, 'hex')}, getAirgapAccounts());
       console.info(
         `[Airgap] sign request ${p.requestIdString ?? '(no id)'} type=${p.dataType} path=${p.derivationPath} chain=${p.chainId ?? '-'} origin=${p.origin ?? '-'} hash=${p.hash.slice(0, 18)}…`,
       );
@@ -63,25 +65,57 @@ export default function ReviewScreen({route, navigation}: Props) {
 
   const chain = parsed?.chainId ? PresetsUtil.getChainData(`eip155:${parsed.chainId}`) : undefined;
 
+  const wallet = parsed ? SettingsStore.getWallet(parsed.account.id) : undefined;
+  const walletType = wallet?.type;
+  // NFC card for hardware accounts (Satodime vaults use a SatodimeCard, no PIN)
+  const card = useRef<SatochipCard | SatodimeCard>(
+    walletType === WalletType.SATODIME ? new SatodimeCard() : new SatochipCard(),
+  ).current;
+  const {withModal, nfcVisible, closeNfc} = useSatochipModal(card);
+
+  /** Run a card operation with the NFC prompt. */
+  const withCard = useCallback(
+    async <T,>(operation: () => Promise<T>): Promise<T> => {
+      const run = withModal(operation);
+      if (!run) {
+        throw new Error('NFC is not supported on this platform');
+      }
+      return (await run()) as T;
+    },
+    [withModal],
+  );
+
   const performSign = useCallback(
     async (pin: string) => {
-      if (!parsed) {
+      if (!parsed || !wallet) {
+        Alert.alert('Error', 'Account not found.');
         return;
       }
-      const wallet = SettingsStore.getWallet(parsed.account.id);
-      if (!(wallet instanceof SatochipWallet)) {
-        Alert.alert('Error', 'Satochip account not found.');
-        return;
-      }
+      const {hash, dataType, chainId, account} = parsed;
       setSigning(true);
       try {
-        const run = withModal(async () =>
-          wallet.signHashForAirgap(parsed.hash, card, pin, parsed.dataType, parsed.chainId),
-        );
-        if (!run) {
-          throw new Error('NFC is not supported on this platform');
+        let sig: AirgapSignature;
+        if (wallet instanceof SatochipWallet) {
+          sig = await withCard(() =>
+            wallet.signHashForAirgap(hash, card as SatochipCard, pin, dataType, chainId),
+          );
+        } else if (wallet.type === WalletType.SATODIME) {
+          // card, vault key and unsealed-state checks happen in signDigestWithSatodime
+          const info = wallet.getWalletInfo() as SatodimeInfo;
+          const der = await withCard(() =>
+            signDigestWithSatodime(card as SatodimeCard, info, Buffer.from(hash.slice(2), 'hex')),
+          );
+          sig = await finalizeSignature(hash, der, account.address, dataType, chainId);
+        } else if (wallet instanceof EIP155SoftwareWallet) {
+          if (!(await wallet.isAvailable())) {
+            await wallet.unlockWallet(pin);
+            SettingsStore.rememberSoftwarePublicKeys();
+          }
+          const {r, s} = wallet.signDigest(hash);
+          sig = await finalizeRawSignature(hash, r, s, account.address, dataType, chainId);
+        } else {
+          throw new Error('Unsupported account type');
         }
-        const sig = (await run()) as AirgapSignature;
         const response = buildEthSignature(parsed.requestId, sig);
         console.info(`[Airgap] signed request ${parsed.requestIdString ?? '(no id)'}`);
         navigation.replace('AirgapSignature', {
@@ -93,17 +127,34 @@ export default function ReviewScreen({route, navigation}: Props) {
         console.warn(`[Airgap] signing failed: ${msg}`);
         Alert.alert('Signing failed', msg, [{text: 'OK'}]);
       } finally {
-        closeNfc();
-        try {
-          await card.endNfcSession();
-        } catch {
-          // session may already be closed
+        if (walletType === WalletType.SATOCHIP || walletType === WalletType.SATODIME) {
+          closeNfc();
+          try {
+            await card.endNfcSession();
+          } catch {
+            // session may already be closed
+          }
         }
         setSigning(false);
       }
     },
-    [parsed, withModal, card, closeNfc, navigation],
+    [parsed, wallet, walletType, withCard, card, closeNfc, navigation],
   );
+
+  /** Satochip: PIN. Software: password unless already unlocked. Satodime: no PIN. */
+  const onApprove = useCallback(async () => {
+    if (walletType === WalletType.SATOCHIP) {
+      setShowPinModal(true);
+    } else if (walletType === WalletType.SOFTWARE && !(await wallet?.isAvailable())) {
+      setShowPinModal(true);
+    } else {
+      performSign('');
+    }
+  }, [performSign, wallet, walletType]);
+
+  const isSoftware = walletType === WalletType.SOFTWARE;
+  const signLabel =
+    walletType === WalletType.SATODIME ? 'Sign with Satodime' : isSoftware ? 'Sign' : 'Sign with Satochip';
 
   const onPinSubmit = useCallback(
     (pin: string) => {
@@ -191,8 +242,8 @@ export default function ReviewScreen({route, navigation}: Props) {
         <ActionButton
           style={styles.halfButton}
           loading={signing}
-          onPress={() => setShowPinModal(true)}>
-          Sign with Satochip
+          onPress={onApprove}>
+          {signLabel}
         </ActionButton>
       </View>
 
@@ -200,10 +251,10 @@ export default function ReviewScreen({route, navigation}: Props) {
         visible={showPinModal}
         onSubmit={onPinSubmit}
         onCancel={() => setShowPinModal(false)}
-        title="Enter PIN to sign"
-        minLength={4}
-        maxLength={16}
-        type="PIN"
+        title={isSoftware ? 'Enter password to sign' : 'Enter PIN to sign'}
+        minLength={isSoftware ? 8 : 4}
+        maxLength={isSoftware ? 64 : 16}
+        type={isSoftware ? 'password' : 'PIN'}
       />
       <NfcPrompt visible={nfcVisible} close={closeNfc} />
     </View>

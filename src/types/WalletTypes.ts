@@ -57,6 +57,12 @@ export interface SatodimeInfo extends WalletInfo {
 export interface SoftwareWalletInfo extends WalletInfo {
   type: WalletType.SOFTWARE;
   encryptedBlob: string;     // encrypted data
+  /**
+   * Compressed public key (33 bytes hex, no 0x). Public data, recorded the
+   * first time the key is available (creation or unlock); needed for QR
+   * pairing with browser extensions.
+   */
+  publicKey?: string;
   //provider?: ethers.providers.Provider;
 }
 

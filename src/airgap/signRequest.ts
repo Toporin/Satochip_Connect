@@ -31,7 +31,9 @@ export type AirgapErrorCode =
   | 'UNKNOWN_PATH'
   | 'ADDRESS_MISMATCH'
   | 'CHAIN_MISMATCH'
-  | 'UNSUPPORTED_TYPE';
+  | 'UNSUPPORTED_TYPE'
+  | 'HELPER_ADDRESS_SELECTED'
+  | 'FINGERPRINT_COLLISION';
 
 export class AirgapError extends Error {
   readonly code: AirgapErrorCode;
@@ -42,14 +44,50 @@ export class AirgapError extends Error {
   }
 }
 
+/**
+ * A sign request for one of the helper keys (#2..#5) of a single-key account.
+ * Raised right after decoding, before any review / PIN / password / NFC step.
+ * The app never signs for helper keys.
+ */
+export class HelperAddressError extends AirgapError {
+  /** Helper number as shown in the extension (2..5). */
+  readonly helperIndex: number;
+  readonly helperAddress: string;
+  readonly primaryAddress: string;
+  readonly accountId: string;
+  constructor(accountId: string, helperIndex: number, helperAddress: string, primaryAddress: string) {
+    super(
+      'HELPER_ADDRESS_SELECTED',
+      `This request is for helper address #${helperIndex} (${helperAddress}), which this app will never sign for. Use address #1 (${primaryAddress}) instead.`,
+    );
+    this.name = 'HelperAddressError';
+    this.accountId = accountId;
+    this.helperIndex = helperIndex;
+    this.helperAddress = helperAddress;
+    this.primaryAddress = primaryAddress;
+  }
+}
+
 /** Minimal account info needed to match a request (subset of SatochipInfo). */
 export interface AirgapAccount {
   id: string;
   name?: string;
   address: string;
+  /** Satochip master fingerprint, or hash160(P)[0..4] for single-key accounts. */
   masterXfp: string;
   derivationPath: string;
+  /**
+   * 'hd' (default): Satochip account, matched by fingerprint + full path.
+   * 'single': single-key account (Satodime vault, software account) paired as
+   * crypto-account: path index 0 is the account, 1..4 are helper keys.
+   */
+  kind?: 'hd' | 'single';
+  /** Single-key accounts: addresses of helper keys #2..#5 (path indexes 1..4). */
+  helperAddresses?: string[];
 }
+
+/** Single-key accounts: path prefix of the 5 published keys (see singleKeyPayload.ts). */
+const SINGLE_KEY_PATH_PREFIX = "44'/60'/0'/0/";
 
 export interface DisplayField {
   label: string;
@@ -644,6 +682,35 @@ export function matchAccount<A extends AirgapAccount>(
     throw new AirgapError('WRONG_WALLET', 'This request is for a different wallet.');
   }
   const normPath = normalizePath(path);
+
+  // Single-key accounts (crypto-account pairing): route by the last path index.
+  const singles = sameCard.filter(a => a.kind === 'single');
+  if (singles.length > 0) {
+    if (sameCard.length > 1) {
+      throw new AirgapError(
+        'FINGERPRINT_COLLISION',
+        'Several of your accounts share this fingerprint, so the request cannot be routed safely. Nothing was signed.',
+      );
+    }
+    const single = singles[0];
+    const match = normPath.startsWith(SINGLE_KEY_PATH_PREFIX)
+      ? /^(\d+)$/.exec(normPath.slice(SINGLE_KEY_PATH_PREFIX.length))
+      : null;
+    const index = match ? Number(match[1]) : -1;
+    const helpers = single.helperAddresses ?? [];
+    if (index >= 1 && index <= helpers.length) {
+      throw new HelperAddressError(single.id, index + 1, helpers[index - 1], single.address);
+    }
+    if (index !== 0) {
+      throw new AirgapError(
+        'UNKNOWN_PATH',
+        `This request uses path m/${normPath}, which is not the paired address of this account. Nothing was signed.`,
+      );
+    }
+    checkRequestAddress(single, address);
+    return single;
+  }
+
   const account = sameCard.find(a => normalizePath(a.derivationPath) === normPath);
   if (!account) {
     throw new AirgapError(
@@ -651,13 +718,17 @@ export function matchAccount<A extends AirgapAccount>(
       `This request uses derivation path m/${normPath}, which does not match any of your Satochip accounts. Add that account first.`,
     );
   }
+  checkRequestAddress(account, address);
+  return account;
+}
+
+function checkRequestAddress(account: AirgapAccount, address?: Buffer): void {
   if (address && address.length > 0) {
     const requested = '0x' + address.toString('hex').toLowerCase();
     if (requested !== account.address.toLowerCase()) {
       throw new AirgapError('ADDRESS_MISMATCH', 'The request address does not match the account derived from its path.');
     }
   }
-  return account;
 }
 
 export function parseSignRequestCBOR<A extends AirgapAccount>(cbor: Buffer, accounts: A[]): ParsedSignRequest<A> {

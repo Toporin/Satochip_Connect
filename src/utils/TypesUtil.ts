@@ -70,6 +70,8 @@ export type RootStackParamList = {
   AirgapSync: {accountId: string};
   AirgapReview: {cborHex: string; urType: string};
   AirgapSignature: {cborHex: string; summary?: string};
+  AirgapSingleKeySync: {accountId: string};
+  AirgapHelperError: {accountId: string; helperIndex: number; helperAddress: string; primaryAddress: string};
 };
 
 export type HomeTabParamList = {

@@ -35,6 +35,21 @@ export async function finalizeSignature(
   chainId?: number,
 ): Promise<AirgapSignature> {
   const { r, s } = parseDERSignature(derSignature);
+  return finalizeRawSignature(hash, r, s, expectedAddress, dataType, chainId);
+}
+
+/**
+ * Same as finalizeSignature, for signers that return r and s directly
+ * (software keys). s must already be low-S.
+ */
+export async function finalizeRawSignature(
+  hash: string,
+  r: string,
+  s: string,
+  expectedAddress: string,
+  dataType: AirgapDataType,
+  chainId?: number,
+): Promise<AirgapSignature> {
   if (ethers.BigNumber.from(s).gt(HALF_N)) {
     // parseDERSignature should already have normalized s; never return high-s.
     throw new Error('Signature is not low-s normalized');
