@@ -40,6 +40,9 @@ export default function SessionProposalModal() {
     () => new Set() // Initialize with no addresses - user must opt-in
   );
 
+  // set when Approve is pressed with no address selected: highlights the hint
+  const [highlightSelectionHint, setHighlightSelectionHint] = useState(false);
+
   // Derive addresses array from Set for compatibility
   const addresses = useMemo(() => Array.from(selectedAddresses), [selectedAddresses]);
   // console.log(`SessionProposalModal addresses: ${addresses}`);
@@ -89,6 +92,24 @@ export default function SessionProposalModal() {
       return newSet;
     });
   }, []);
+
+  // Approve pressed without any selected address: explain why nothing happens
+  const onApproveWithoutAddress = useCallback(() => {
+    setHighlightSelectionHint(true);
+    Toast.show(
+      allAddresses.length === 0
+        ? {
+            type: 'info',
+            text1: 'No account to connect',
+            text2: 'Add an account in the Accounts tab, then connect again.',
+          }
+        : {
+            type: 'info',
+            text1: 'Select an address first',
+            text2: 'Tap at least one address in the list to share it with this app.',
+          },
+    );
+  }, [allAddresses.length]);
 
   // Handle approve action, construct session namespace
   const onApprove = useCallback(async () => {
@@ -157,7 +178,8 @@ export default function SessionProposalModal() {
       onReject={onReject}
       approveLoader={isLoadingApprove}
       rejectLoader={isLoadingReject}
-      disableApprove={selectedAddresses.size === 0}>
+      disableApprove={selectedAddresses.size === 0}
+      onDisabledApprovePress={onApproveWithoutAddress}>
       <View style={[styles.divider, {backgroundColor: Theme['bg-300']}]} />
       <View style={styles.container}>
         <Chains chains={supportedChains} />
@@ -165,6 +187,7 @@ export default function SessionProposalModal() {
           addresses={allAddresses}
           selectedAddresses={selectedAddresses}
           onToggleAddress={handleToggleAddress}
+          highlightHint={highlightSelectionHint}
         />
         <Methods methods={methods} />
         <Events events={events} />

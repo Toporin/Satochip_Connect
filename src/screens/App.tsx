@@ -1,15 +1,15 @@
 import {useCallback, useEffect} from 'react';
 import Config from 'react-native-config';
-import {Linking, Platform, StatusBar, useColorScheme} from 'react-native';
+import {Linking, StatusBar, useColorScheme} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {
   SafeAreaProvider,
   initialWindowMetrics,
-  useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import BootSplash from 'react-native-bootsplash';
 import Toast from 'react-native-toast-message';
+import {AppToast} from '@/components/AppToast';
 import {RELAYER_EVENTS} from '@walletconnect/core';
 import { LogBox } from 'react-native';
 
@@ -166,20 +166,5 @@ const App = () => {
     </SafeAreaProvider>
   );
 };
-
-/**
- * Toast host. On Android the app draws edge-to-edge (enforced when targeting
- * SDK 35+), so a 0 offset puts toasts under the status bar and camera
- * cutout: offset them by the top safe-area inset instead.
- */
-function AppToast() {
-  const insets = useSafeAreaInsets();
-  return (
-    <Toast
-      position="top"
-      topOffset={Platform.select({ios: 80, android: insets.top + 8})}
-    />
-  );
-}
 
 export default Sentry.wrap(App);

@@ -18,6 +18,7 @@ export interface RequestModalProps {
   intention?: string;
   isLinkMode?: boolean;
   disableApprove?: boolean;
+  onDisabledApprovePress?: () => void;
 }
 
 export function RequestModal({
@@ -30,6 +31,7 @@ export function RequestModal({
   intention,
   isLinkMode,
   disableApprove,
+  onDisabledApprovePress,
 }: RequestModalProps) {
   const Theme = useTheme();
   const {currentRequestVerifyContext} = useSnapshot(SettingsStore.state);
@@ -50,6 +52,7 @@ export function RequestModal({
         rejectLoader={rejectLoader}
         verifyContext={currentRequestVerifyContext}
         disableApprove={disableApprove}
+        onDisabledApprovePress={onDisabledApprovePress}
       />
     </View>
   );
