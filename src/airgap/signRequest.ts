@@ -715,7 +715,7 @@ export function matchAccount<A extends AirgapAccount>(
   if (!account) {
     throw new AirgapError(
       'UNKNOWN_PATH',
-      `This request uses derivation path m/${normPath}, which does not match any of your Satochip accounts. Add that account first.`,
+      `This request uses derivation path m/${normPath}, which does not match any of your accounts. Add that account first.`,
     );
   }
   checkRequestAddress(account, address);

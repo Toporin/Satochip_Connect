@@ -91,9 +91,39 @@ export class EIP155SoftwareWallet implements ISoftwareWallet {
       );
     }
 
-    // record the public key (public data) for QR pairing; persisted by the caller
-    if (!this.softwareWalletInfo.publicKey) {
-      this.softwareWalletInfo.publicKey = utils.computePublicKey(this.wallet.publicKey, true).slice(2);
+    this.recordPairingData();
+  }
+
+  /**
+   * Record the public data used for QR pairing (persisted by the caller):
+   * public key, and for mnemonic accounts the master fingerprint and the
+   * account-level xpub at m/44'/60'/0' (same layout as Satochip accounts).
+   */
+  private recordPairingData() {
+    const info = this.softwareWalletInfo;
+    const sensitive = this.sensitiveInfo;
+    if (!this.wallet || !sensitive) {
+      return;
+    }
+    info.keyType = sensitive.keyType;
+    info.publicKey = utils.computePublicKey(this.wallet.publicKey, true).slice(2);
+
+    const path = sensitive.derivationPath || "m/44'/60'/0'/0/0";
+    if (
+      sensitive.keyType === 'mnemonic' &&
+      sensitive.mnemonic &&
+      !sensitive.passphrase && // passphrase accounts are not created by the app (see setupWallet)
+      /^m\/44'\/60'\/0'\/0\/\d+$/.test(path) &&
+      !info.xpub
+    ) {
+      const root = utils.HDNode.fromMnemonic(sensitive.mnemonic);
+      const derived = root.derivePath(path);
+      if (derived.address !== this.address) {
+        return; // never publish an xpub that does not derive this account
+      }
+      info.derivationPath = path;
+      info.masterXfp = root.fingerprint.slice(2).toUpperCase();
+      info.xpub = root.derivePath("m/44'/60'/0'").neuter().extendedKey;
     }
   }
 
