@@ -390,7 +390,7 @@ export default function AccountDetail({ route, navigation }: Props) {
                   styles.accountTypeText,
                   { color: isHardware ? Theme['inverse-100'] : Theme['fg-150'] },
                 ]}>
-                {isSatodime ? 'Satodime' : isHardware ? 'Hardware' : 'Software'}
+                {isSatodime ? 'Satodime' : isHardware ? 'Satochip' : 'Software'}
               </Text>
             </View>
           </View>
@@ -485,29 +485,36 @@ export default function AccountDetail({ route, navigation }: Props) {
           </TouchableOpacity>
         </View>
 
+        {/* Airgap QR code: pair with browser extensions (MetaMask, Rabby...) */}
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: Theme['accent-100'] }]}
+            onPress={() =>
+              // Satodime vaults hold a single key (crypto-account); Satochip and
+              // software accounts share an xpub (crypto-hdkey; the screen redirects
+              // private-key software accounts to the single-key pairing)
+              isSatodime
+                ? navigation.navigate('AirgapSingleKeySync', { accountId })
+                : navigation.navigate('AirgapSync', { accountId })
+            }
+            activeOpacity={0.7}>
+            <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
+              Connect to browser extension (QR)
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Hardware-specific section (conditional on wallet type) */}
         {isHardware && 'masterXfp' in walletInfo && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: Theme['fg-100'] }]}>
-              Hardware Details
+              Satochip Details
             </Text>
             <View style={[styles.infoCard, { backgroundColor: Theme['bg-175'] }]}>
               {renderInfoField('Master Fingerprint', (walletInfo as SatochipInfo).masterXfp, true)}
               {renderInfoField('Derivation Path', (walletInfo as SatochipInfo).derivationPath, true)}
               {renderInfoField('xPub', (walletInfo as SatochipInfo).xpub, true)}
             </View>
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.airgapButton,
-                { backgroundColor: Theme['accent-100'] },
-              ]}
-              onPress={() => navigation.navigate('AirgapSync', { accountId })}
-              activeOpacity={0.7}>
-              <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
-                Connect to browser extension (QR)
-              </Text>
-            </TouchableOpacity>
           </View>
         )}
 
@@ -536,35 +543,10 @@ export default function AccountDetail({ route, navigation }: Props) {
             )}
             <TouchableOpacity
               style={[styles.actionButton, styles.airgapButton, { backgroundColor: Theme['accent-100'] }]}
-              onPress={() => navigation.navigate('AirgapSingleKeySync', { accountId })}
-              activeOpacity={0.7}>
-              <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
-                Connect to browser extension (QR)
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.airgapButton, { backgroundColor: Theme['accent-100'] }]}
               onPress={rescanSatodimeVault}
               activeOpacity={0.7}>
               <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
                 Re-scan card
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Software account: QR pairing with browser extensions */}
-        {wallet.type === WalletType.SOFTWARE && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: Theme['fg-100'] }]}>
-              Browser extension
-            </Text>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.airgapButton, { backgroundColor: Theme['accent-100'] }]}
-              onPress={() => navigation.navigate('AirgapSync', { accountId })}
-              activeOpacity={0.7}>
-              <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
-                Connect to browser extension (QR)
               </Text>
             </TouchableOpacity>
           </View>

@@ -17,7 +17,7 @@ import { AccountsStackScreenProps } from '@/utils/TypesUtil';
 import styles from './styles';
 import { Icon } from '@reown/appkit-ui-react-native';
 import { formatUSD } from '@/utils/formatters';
-import { SatodimeVaultState } from '@/types/WalletTypes';
+import { WalletType } from '@/types/WalletTypes';
 
 type Props = AccountsStackScreenProps<'Accounts'>;
 
@@ -25,7 +25,7 @@ interface AccountItem {
   id: string;
   name: string;
   address: string;
-  type: 'software' | 'hardware';
+  type: WalletType;
   /** Text of the account type chip */
   chipLabel: string;
   blockchain: string;
@@ -51,8 +51,8 @@ export default function AccountsScreen({ navigation }: Props) {
         id: wallet.id,
         name: `${info.name || 'Satochip'}`,
         address: wallet.address || 'Not derived',
-        type: 'hardware',
-        chipLabel: 'Hardware',
+        type: wallet.type,
+        chipLabel: 'Satochip',
         blockchain: wallet.blockchain,
         masterXfp: info.masterXfp,
         derivationPath: info.derivationPath,
@@ -62,13 +62,12 @@ export default function AccountsScreen({ navigation }: Props) {
     // Add Satodime vault accounts
     for (const wallet of SettingsStore.getSatodimeWallets()) {
       const info = wallet.getWalletInfo();
-      const sealed = info.vaultState !== SatodimeVaultState.UNSEALED;
       accountsList.push({
         id: wallet.id,
         name: `${info.name || 'Satodime'}`,
         address: wallet.address,
-        type: 'hardware',
-        chipLabel: `Satodime #${info.vaultIndex + 1}${sealed ? ' · watch-only' : ''}`,
+        type: wallet.type,
+        chipLabel: 'Satodime',
         blockchain: wallet.blockchain,
       });
     }
@@ -81,7 +80,7 @@ export default function AccountsScreen({ navigation }: Props) {
         id: wallet.id,
         name: `${info.name || 'Software'}`,
         address: wallet.address,
-        type: 'software',
+        type: wallet.type,
         chipLabel: 'Software',
         blockchain: wallet.blockchain,
       });
@@ -144,7 +143,7 @@ export default function AccountsScreen({ navigation }: Props) {
   };
 
   const renderAccountCard = (account: AccountItem) => {
-    const isHardware = account.type === 'hardware';
+    const isHardware = account.type !== WalletType.SOFTWARE;
 
     return (
       <View
