@@ -186,58 +186,75 @@ async function requireSameCard(card: SatodimeCard, expectedAuthentikey: string):
   }
 }
 
-/** Take ownership of an unclaimed card and store its unlock secret securely. */
-export async function claimSatodime(card: SatodimeCard, expectedAuthentikey: string): Promise<void> {
-  await requireSameCard(card, expectedAuthentikey);
-  const status = await card.getStatus();
-  if (status.setupDone) {
-    throw new Error('This card already has an owner.');
-  }
+/** Claim an ownerless card (SETUP) and store the returned unlock code (the CVC itself on CVC cards). */
+async function claimAndStore(card: SatodimeCard, info: SatodimeInfo): Promise<Buffer> {
   const ownership = await card.claimOwnership();
-  await SecretStore.setSatodimeUnlockSecret(expectedAuthentikey, ownership.unlockSecret);
+  await SecretStore.setSatodimeUnlockSecret(info.authentikey, ownership.unlockSecret);
+  return ownership.unlockSecret;
 }
 
-/** Check the CVC engraved on the card and store it as the unlock secret. */
-export async function registerSatodimeCvc(card: SatodimeCard, expectedAuthentikey: string, cvc: string): Promise<void> {
-  await requireSameCard(card, expectedAuthentikey);
+/** Check the code typed by the user against the card (0x54) and store it if correct. */
+async function verifyAndStoreCvc(card: SatodimeCard, info: SatodimeInfo, cvc: string): Promise<Buffer> {
   let secret: Buffer;
   try {
     secret = cvcToUnlockSecret(cvc);
   } catch {
-    throw new Error('Invalid code format.');
+    throw new Error('Invalid card code format.');
   }
   card.setUnlockSecret(secret);
-  const ok = await card.checkUnlockCode();
-  if (!ok) {
+  if (!(await checkUnlockCodeTwice(card))) {
     card.setUnlockSecret(null);
-    throw new Error('Incorrect card code. Check the code printed on the card.');
+    throw new Error('Incorrect card code. Check the code engraved on the card. Nothing was signed.');
   }
-  await SecretStore.setSatodimeUnlockSecret(expectedAuthentikey, secret);
+  await SecretStore.setSatodimeUnlockSecret(info.authentikey, secret);
+  return secret;
 }
 
 /**
- * Sign a 32-byte digest with the account's vault, after checking that:
- *  1. the card supports hash signing (protocol >= 0.2),
- *  2. the card authentikey matches the account (right card),
- *  3. the vault is unsealed,
- *  4. the vault public key matches the account,
- *  5. this device holds the card unlock secret.
- * Returns the DER signature from the card.
+ * Unseal a vault (irreversible). The card returns the private key: it is never
+ * kept, returned or logged, and its buffers are wiped right away.
  */
-/** What a signature needs from the user before it can be retried. */
-export type SatodimeUnlockKind = 'cvc' | 'claim';
+async function unsealVault(card: SatodimeCard, vaultIndex: number): Promise<void> {
+  const disclosed = await card.unseal(vaultIndex);
+  disclosed.privkey.fill(0);
+  disclosed.userEntropy.fill(0);
+  disclosed.cardEntropy.fill(0);
+}
+
+/** Non-CVC card owned by another app: this phone cannot get its unlock code. */
+function ownedElsewhereMessage(sealed: boolean): string {
+  const release =
+    'Release its ownership from the app that owns it (Satodime on mobile or Satochip-Utils on desktop), then try again.';
+  return sealed
+    ? `This vault is sealed, and unsealing it requires the card ownership. The card is owned by another app. ${release}`
+    : `This card is owned by another app. ${release}`;
+}
 
 /**
- * Raised inside the NFC session when signing needs user input (the engraved
- * CVC, or permission to claim an ownerless card). The caller asks the user
- * outside the NFC session and retries (see satodimeUnlock.ts).
+ * What a signature still needs from the user. Computed in one pass inside the
+ * NFC session, before anything changes on the card, so the user is asked once
+ * (see satodimeUnlock.ts) and the signature retried once.
  */
+export interface SatodimeNeeds {
+  /** permission to unseal the vault (irreversible) */
+  unseal?: boolean;
+  /** permission to claim the card (it has no owner) */
+  claim?: boolean;
+  /** the code engraved on the card (CVC card without stored code) */
+  cvc?: boolean;
+}
+
+export function hasNeeds(needs: SatodimeNeeds): boolean {
+  return !!(needs.unseal || needs.claim || needs.cvc);
+}
+
+/** Raised inside the NFC session when signing needs user input; the caller asks and retries. */
 export class SatodimeUnlockRequired extends Error {
-  readonly kind: SatodimeUnlockKind;
-  constructor(kind: SatodimeUnlockKind) {
-    super(kind === 'cvc' ? 'The code engraved on the card is required to sign.' : 'This card has no owner: it must be claimed to sign.');
+  readonly needs: SatodimeNeeds;
+  constructor(needs: SatodimeNeeds) {
+    super('User input is required to sign with this Satodime vault.');
     this.name = 'SatodimeUnlockRequired';
-    this.kind = kind;
+    this.needs = needs;
   }
 }
 
@@ -256,6 +273,8 @@ export interface SatodimeSignOptions {
   cvc?: string;
   /** the user agreed to claim the card if it has no owner */
   allowClaim?: boolean;
+  /** the user agreed to unseal the vault if it is sealed */
+  allowUnseal?: boolean;
   /** called with the card state read during the session */
   onCardState?: (state: SatodimeObservedState) => void;
 }
@@ -265,6 +284,15 @@ async function checkUnlockCodeTwice(card: SatodimeCard): Promise<boolean> {
   return (await card.checkUnlockCode()) || (await card.checkUnlockCode());
 }
 
+/**
+ * Sign a 32-byte digest with the account's vault (one NFC session):
+ *  1. check the card version, the card (authentikey) and the vault key;
+ *  2. compute what is missing from the user (unseal / claim / CVC permission
+ *     or code) and throw SatodimeUnlockRequired before changing anything;
+ *  3. get the unlock code: stored, claimed (ownerless card) or typed CVC;
+ *  4. unseal the vault if it is sealed (with the user's permission);
+ *  5. sign. Returns the DER signature from the card.
+ */
 export async function signDigestWithSatodime(
   card: SatodimeCard,
   info: SatodimeInfo,
@@ -283,10 +311,7 @@ export async function signDigestWithSatodime(
 
   const keyslot = await card.getKeyslotStatus(info.vaultIndex);
   const vaultState = keyslot.state as number as SatodimeVaultState;
-  if (vaultState === SatodimeVaultState.SEALED) {
-    throw new Error(`Vault #${info.vaultIndex + 1} is sealed: this account is watch-only. Unseal the vault in the Satodime app to spend from it.`);
-  }
-  if (vaultState !== SatodimeVaultState.UNSEALED) {
+  if (vaultState === SatodimeVaultState.UNINITIALIZED) {
     throw new Error(`Vault #${info.vaultIndex + 1} is empty: it was reset since this account was added.`);
   }
 
@@ -295,48 +320,42 @@ export async function signDigestWithSatodime(
     throw new Error(`Vault #${info.vaultIndex + 1} holds a different key than this account (the vault was reset and sealed again).`);
   }
 
-  // Ownership / unlock code (state also reported for opportunistic updates)
-  const satodimeStatus = await card.getSatodimeStatus();
-  const isCvcCard = satodimeStatus.fixedUnlockSecret === true;
-  options.onCardState?.({ fixedUnlockSecret: isCvcCard, cardHasOwner: status.setupDone, vaultState });
+  // Card state (also reported for opportunistic updates of stored accounts)
+  const sealed = vaultState === SatodimeVaultState.SEALED;
+  const isCvcCard = (await card.getSatodimeStatus()).fixedUnlockSecret === true;
+  const report = (state: Partial<SatodimeObservedState>) =>
+    options.onCardState?.({ fixedUnlockSecret: isCvcCard, cardHasOwner: status.setupDone, vaultState, ...state });
+  report({});
 
+  // What is still missing from the user, before anything changes on the card
+  const storedSecret = await SecretStore.getSatodimeUnlockSecret(info.authentikey);
+  const needs: SatodimeNeeds = {
+    unseal: sealed && !options.allowUnseal,
+    claim: !status.setupDone && !options.allowClaim,
+    cvc: status.setupDone && isCvcCard && !storedSecret && !options.cvc,
+  };
+  if (hasNeeds(needs)) {
+    throw new SatodimeUnlockRequired(needs);
+  }
+  if (status.setupDone && !isCvcCard && !storedSecret) {
+    throw new Error(ownedElsewhereMessage(sealed));
+  }
+
+  // Unlock code: stored, claimed (ownerless card) or typed CVC
+  let secret: Buffer;
   if (!status.setupDone) {
-    if (!options.allowClaim) {
-      throw new SatodimeUnlockRequired('claim');
-    }
-    // SETUP returns the unlock code (on a CVC card, the engraved code itself)
-    const ownership = await card.claimOwnership();
-    await SecretStore.setSatodimeUnlockSecret(info.authentikey, ownership.unlockSecret);
-    options.onCardState?.({ fixedUnlockSecret: isCvcCard, cardHasOwner: true, vaultState });
-  }
-
-  let secret = await SecretStore.getSatodimeUnlockSecret(info.authentikey);
-  if (!secret && isCvcCard) {
-    if (!options.cvc) {
-      throw new SatodimeUnlockRequired('cvc');
-    }
-    let candidate: Buffer;
-    try {
-      candidate = cvcToUnlockSecret(options.cvc);
-    } catch {
-      throw new Error('Invalid card code format.');
-    }
-    card.setUnlockSecret(candidate);
-    if (!(await checkUnlockCodeTwice(card))) {
-      card.setUnlockSecret(null);
-      throw new Error('Incorrect card code. Check the code engraved on the card. Nothing was signed.');
-    }
-    await SecretStore.setSatodimeUnlockSecret(info.authentikey, candidate);
-    secret = candidate;
-  }
-  if (!secret) {
-    throw new Error(
-      'This card is owned by another app. Release its ownership from that app (e.g. Satodime on mobile or Satochip-Utils on desktop), then try again.',
-    );
+    secret = await claimAndStore(card, info);
+    report({ cardHasOwner: true });
+  } else {
+    secret = storedSecret ?? (await verifyAndStoreCvc(card, info, options.cvc!));
   }
   card.setUnlockSecret(secret);
 
   try {
+    if (sealed) {
+      await unsealVault(card, info.vaultIndex);
+      report({ cardHasOwner: true, vaultState: SatodimeVaultState.UNSEALED });
+    }
     return await card.signTransactionHash(info.vaultIndex, digest);
   } catch (error) {
     const sw = statusWordOf(error);
@@ -376,8 +395,8 @@ export interface SatodimeCardState {
 }
 
 /**
- * Re-read the state of an account's card and vault (e.g. after the vault was
- * unsealed in the Satodime app), checking that the card and the vault key
+ * Re-read the state of an account's card and vault (e.g. after it changed in
+ * another app), checking that the card and the vault key
  * still match. Ownership is checked with the stored unlock code (0x54).
  */
 export async function readSatodimeCardState(card: SatodimeCard, info: SatodimeInfo): Promise<SatodimeCardState> {

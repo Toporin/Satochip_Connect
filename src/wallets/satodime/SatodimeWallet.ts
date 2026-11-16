@@ -2,15 +2,14 @@
  * Satodime vault account.
  *
  * One account = one vault (key slot) of a Satodime card. No PIN: signing needs
- * the card, an UNSEALED vault and the card unlock secret stored on this device.
- * Sealed vaults are watch-only.
+ * the card and its unlock code. A sealed vault is unsealed, with the user's
+ * permission, when it first signs (see satodimeUnlock.ts).
  */
 import type { SatodimeCard } from 'satochip-react-native';
 
 import {
   ISatodimeWallet,
   SatodimeInfo,
-  SatodimeVaultState,
   WalletError,
   WalletErrorType,
   WalletType,
@@ -49,10 +48,6 @@ export class SatodimeWallet implements ISatodimeWallet {
     return decodeSatodimeSlip44(this.satodimeInfo.slip44);
   }
 
-  /** Sealed vaults cannot sign (the applet only signs with unsealed vaults). */
-  isWatchOnly(): boolean {
-    return this.satodimeInfo.vaultState !== SatodimeVaultState.UNSEALED;
-  }
 
   private cardSigner(card: SatodimeCard, options?: SatodimeSignOptions): DigestSigner {
     return (digest: Buffer) => signDigestWithSatodime(card, this.satodimeInfo, digest, options);

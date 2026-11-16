@@ -163,7 +163,7 @@ export default function SatodimeVaultSelectScreen({ route, navigation }: Props) 
               )}
               {avail.selectable && vault.state === SatodimeVaultState.SEALED && (
                 <Text style={[styles.small, { color: Theme['fg-150'] }]}>
-                  Sealed: added as watch-only. Unseal it in the Satodime app to spend.
+                  Sealed: it will be unsealed (with your permission) before the first signature.
                 </Text>
               )}
             </TouchableOpacity>

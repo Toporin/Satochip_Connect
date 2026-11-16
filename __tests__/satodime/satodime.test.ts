@@ -211,6 +211,14 @@ describe('card and vault checks before signing', () => {
       checkUnlockCode: jest.fn(async () => (checks.length > 0 ? checks.shift()! : false)),
       transferOwnership: jest.fn(async () => undefined),
       claimOwnership: jest.fn(async () => ({ unlockCounter: Buffer.alloc(4), unlockSecret: Buffer.alloc(20, 7) })),
+      unseal: jest.fn(async () => ({
+        privkey: Buffer.alloc(32, 0x11),
+        userEntropy: Buffer.alloc(32, 0x22),
+        cardEntropy: Buffer.alloc(32, 0x33),
+        authentikeyCoordx: Buffer.alloc(32),
+        signedData: Buffer.alloc(0),
+        signature: Buffer.alloc(0),
+      })),
       supportsHashSigning: (s: { version: { protocolVersion: number } }) => s.version.protocolVersion >= 2,
       getAuthentikey: async () => ({ getPublicKeyBytes: () => Buffer.from(o.authentikey, 'hex') }),
       getKeyslotStatus: async () => ({ state: o.state }),
@@ -247,11 +255,6 @@ describe('card and vault checks before signing', () => {
     const { card } = mockCard({ authentikey: '03' + '44'.repeat(32) });
     await expect(signDigestWithSatodime(card, info, digest)).rejects.toThrow(/Wrong card/);
     expect(card.signTransactionHash).not.toHaveBeenCalled();
-  });
-
-  test('sealed vault is watch-only', async () => {
-    const { card } = mockCard({ state: 1 });
-    await expect(signDigestWithSatodime(card, info, digest)).rejects.toThrow(/sealed/);
   });
 
   test('reset vault', async () => {
@@ -294,8 +297,6 @@ describe('card and vault checks before signing', () => {
     const wallet = new SatodimeWallet(info);
     const sig = await wallet.signEthereumMessage('hello', card, VAULT.address, 1);
     expect(ethers.utils.verifyMessage('hello', sig)).toBe(VAULT.address);
-    expect(wallet.isWatchOnly()).toBe(false);
-    expect(new SatodimeWallet({ ...info, vaultState: SatodimeVaultState.SEALED }).isWatchOnly()).toBe(true);
   });
 
   describe('card state and ownership', () => {
@@ -365,7 +366,7 @@ describe('card and vault checks before signing', () => {
     test('CVC card without stored code: CVC required, wrong code refused, right code stored', async () => {
       mockKeychain.clear();
       const required = mockCard({ fixedUnlockSecret: true });
-      await expect(signDigestWithSatodime(required.card, info, digest)).rejects.toMatchObject({ kind: 'cvc' });
+      await expect(signDigestWithSatodime(required.card, info, digest)).rejects.toMatchObject({ needs: { cvc: true } });
 
       const wrong = mockCard({ fixedUnlockSecret: true, checkResults: [false, false] });
       await expect(signDigestWithSatodime(wrong.card, info, digest, { cvc: 'BAD' })).rejects.toThrow(/Incorrect card code/);
@@ -386,7 +387,12 @@ describe('card and vault checks before signing', () => {
     });
 
     function fakePrompts(cvc: string | null = 'ABC123', claim = true) {
-      return { requestCvc: jest.fn(async () => cvc), confirmClaim: jest.fn(async () => claim) };
+      return {
+        requestCvc: jest.fn(async () => cvc),
+        confirmClaim: jest.fn(async () => claim),
+        confirmUnseal: jest.fn(async () => claim),
+        informOwnershipRequired: jest.fn(async () => undefined),
+      };
     }
 
     test('known CVC card without code: prompt before the first attempt', async () => {
@@ -411,7 +417,7 @@ describe('card and vault checks before signing', () => {
       const prompts = fakePrompts();
       const attempt = jest
         .fn()
-        .mockRejectedValueOnce(new SatodimeUnlockRequired('claim'))
+        .mockRejectedValueOnce(new SatodimeUnlockRequired({ claim: true }))
         .mockResolvedValueOnce('signed');
       await expect(signWithSatodimeUnlock(info, attempt, prompts)).resolves.toBe('signed');
       expect(prompts.confirmClaim).toHaveBeenCalledTimes(1);
@@ -421,9 +427,133 @@ describe('card and vault checks before signing', () => {
 
     test('declined prompt: cancelled, no second attempt', async () => {
       const prompts = fakePrompts(null, false);
-      const attempt = jest.fn().mockRejectedValueOnce(new SatodimeUnlockRequired('cvc'));
+      const attempt = jest.fn().mockRejectedValueOnce(new SatodimeUnlockRequired({ cvc: true }));
       await expect(signWithSatodimeUnlock(info, attempt, prompts)).rejects.toThrow(/cancelled/);
       expect(attempt).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('sealed vault: unseal when signing', () => {
+    const sealedInfo = { ...info, vaultState: SatodimeVaultState.SEALED };
+
+    test('without permission: unseal needed, nothing changes on the card', async () => {
+      const { card } = mockCard({ state: 1 });
+      await expect(signDigestWithSatodime(card, info, digest)).rejects.toMatchObject({ needs: { unseal: true } });
+      expect(card.unseal).not.toHaveBeenCalled();
+      expect(card.signTransactionHash).not.toHaveBeenCalled();
+    });
+
+    test('code stored + permission: unseal, wipe the disclosed key, report UNSEALED, sign', async () => {
+      const { card } = mockCard({ state: 1 });
+      const states: Array<{ vaultState: number }> = [];
+      const der = await signDigestWithSatodime(card, info, digest, { allowUnseal: true, onCardState: st => states.push(st) });
+      expect(der[0]).toBe(0x30);
+      expect(card.unseal).toHaveBeenCalledWith(1);
+      const disclosed = await (card.unseal as jest.Mock).mock.results[0].value;
+      expect(disclosed.privkey.every((b: number) => b === 0)).toBe(true);
+      expect(disclosed.userEntropy.every((b: number) => b === 0)).toBe(true);
+      expect(disclosed.cardEntropy.every((b: number) => b === 0)).toBe(true);
+      expect(states[states.length - 1].vaultState).toBe(SatodimeVaultState.UNSEALED);
+    });
+
+    test('ownerless card: needs unseal + claim in one go, then claim, unseal and sign', async () => {
+      mockKeychain.clear();
+      const { card } = mockCard({ state: 1, setupDone: false });
+      await expect(signDigestWithSatodime(card, info, digest)).rejects.toMatchObject({
+        needs: { unseal: true, claim: true, cvc: false },
+      });
+      await signDigestWithSatodime(card, info, digest, { allowUnseal: true, allowClaim: true });
+      expect(card.claimOwnership).toHaveBeenCalledTimes(1);
+      expect(card.unseal).toHaveBeenCalledTimes(1);
+      expect(card.signTransactionHash).toHaveBeenCalledTimes(1);
+    });
+
+    test('CVC card without code: needs unseal + CVC, then verify, unseal and sign', async () => {
+      mockKeychain.clear();
+      const { card } = mockCard({ state: 1, fixedUnlockSecret: true });
+      await expect(signDigestWithSatodime(card, info, digest)).rejects.toMatchObject({
+        needs: { unseal: true, claim: false, cvc: true },
+      });
+      await signDigestWithSatodime(card, info, digest, { allowUnseal: true, cvc: 'ABC123' });
+      expect(card.unseal).toHaveBeenCalledTimes(1);
+      expect(await SecretStore.hasSatodimeUnlockSecret(AUTHENTIKEY)).toBe(true);
+    });
+
+    test('non-CVC card owned elsewhere: ownership message, not unsealed', async () => {
+      mockKeychain.clear();
+      const { card } = mockCard({ state: 1 });
+      await expect(signDigestWithSatodime(card, info, digest, { allowUnseal: true })).rejects.toThrow(
+        /unsealing it requires the card ownership.*Satochip-Utils/,
+      );
+      expect(card.unseal).not.toHaveBeenCalled();
+    });
+
+    function prompts(answer = true) {
+      return {
+        requestCvc: jest.fn(async () => 'ABC123'),
+        confirmClaim: jest.fn(async () => answer),
+        confirmUnseal: jest.fn(async () => answer),
+        informOwnershipRequired: jest.fn(async () => undefined),
+      };
+    }
+
+    test('stored code: unseal permission asked before the tap', async () => {
+      const p = prompts();
+      const attempt = jest.fn(async () => 'ok');
+      await signWithSatodimeUnlock(sealedInfo, attempt, p);
+      expect(p.confirmUnseal).toHaveBeenCalledWith(sealedInfo, { claim: false });
+      expect(attempt).toHaveBeenCalledWith({ allowUnseal: true });
+      expect(p.requestCvc).not.toHaveBeenCalled();
+    });
+
+    test('CVC card without code: unseal permission, then CVC, one attempt', async () => {
+      mockKeychain.clear();
+      const p = prompts();
+      const attempt = jest.fn(async () => 'ok');
+      await signWithSatodimeUnlock({ ...sealedInfo, fixedUnlockSecret: true, cardHasOwner: true }, attempt, p);
+      expect(p.confirmUnseal).toHaveBeenCalledTimes(1);
+      expect(p.requestCvc).toHaveBeenCalledTimes(1);
+      expect(attempt).toHaveBeenCalledTimes(1);
+      expect(attempt).toHaveBeenCalledWith({ allowUnseal: true, cvc: 'ABC123' });
+    });
+
+    test('ownerless card: one popup for claim + unseal', async () => {
+      mockKeychain.clear();
+      const p = prompts();
+      const attempt = jest.fn(async () => 'ok');
+      await signWithSatodimeUnlock({ ...sealedInfo, fixedUnlockSecret: false, cardHasOwner: false }, attempt, p);
+      expect(p.confirmUnseal).toHaveBeenCalledWith(expect.anything(), { claim: true });
+      expect(p.confirmClaim).not.toHaveBeenCalled();
+      expect(attempt).toHaveBeenCalledWith({ allowUnseal: true, allowClaim: true });
+    });
+
+    test('non-CVC card owned elsewhere: explained, card never touched', async () => {
+      mockKeychain.clear();
+      const p = prompts();
+      const attempt = jest.fn(async () => 'ok');
+      await expect(
+        signWithSatodimeUnlock({ ...sealedInfo, fixedUnlockSecret: false, cardHasOwner: true }, attempt, p),
+      ).rejects.toThrow(/ownership is required/);
+      expect(p.informOwnershipRequired).toHaveBeenCalledTimes(1);
+      expect(attempt).not.toHaveBeenCalled();
+    });
+
+    test('stale state: the card reports unseal + CVC, both asked, one retry', async () => {
+      mockKeychain.clear();
+      const p = prompts();
+      const attempt = jest
+        .fn()
+        .mockRejectedValueOnce(new SatodimeUnlockRequired({ unseal: true, cvc: true }))
+        .mockResolvedValueOnce('signed');
+      await expect(signWithSatodimeUnlock(info, attempt, p)).resolves.toBe('signed');
+      expect(attempt).toHaveBeenNthCalledWith(2, { allowUnseal: true, cvc: 'ABC123' });
+    });
+
+    test('declined unseal: cancelled, card never touched', async () => {
+      const p = prompts(false);
+      const attempt = jest.fn(async () => 'ok');
+      await expect(signWithSatodimeUnlock(sealedInfo, attempt, p)).rejects.toThrow(/cancelled/);
+      expect(attempt).not.toHaveBeenCalled();
     });
   });
 });

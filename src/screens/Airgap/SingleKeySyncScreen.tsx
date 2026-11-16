@@ -147,7 +147,7 @@ export default function SingleKeySyncScreen({route, navigation}: Props) {
 
           {source.sealed && (
             <Text style={[styles.text, {color: Theme['fg-150']}]}>
-              This vault is sealed: the account is watch-only until you unseal it in the Satodime app.
+              This vault is sealed: it will be unsealed, with your permission, at the first signature.
             </Text>
           )}
 

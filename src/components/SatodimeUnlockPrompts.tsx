@@ -16,10 +16,33 @@ import {registerSatodimePromptHost} from '@/wallets/satodime/satodimePrompts';
 
 const MAX_CVC_LENGTH = 20;
 
+/** Yes/no popup; resolves false on cancel or dismiss. */
+function confirm(title: string, message: string, confirmText: string): Promise<boolean> {
+  return new Promise<boolean>(resolve => {
+    Alert.alert(
+      title,
+      message,
+      [
+        {text: 'Cancel', style: 'cancel', onPress: () => resolve(false)},
+        {text: confirmText, onPress: () => resolve(true)},
+      ],
+      {cancelable: true, onDismiss: () => resolve(false)},
+    );
+  });
+}
+
+/** What claiming means for this card type. */
+function claimConsequence(info: SatodimeInfo): string {
+  return info.fixedUnlockSecret
+    ? 'Anyone holding the card and its engraved code can also take ownership.'
+    : 'It will then be the only app able to sign with this card. Ownership can be released later from the account screen.';
+}
+
 /**
  * Host for the Satodime unlock prompts used when signing (mounted once):
  * - the code engraved on a CVC card;
- * - permission to claim an ownerless card.
+ * - permission to claim an ownerless card;
+ * - permission to unseal a sealed vault, or why it can't be unsealed.
  * Shown outside NFC sessions (see wallets/satodime/satodimeUnlock.ts).
  */
 export function SatodimeUnlockPrompts() {
@@ -37,17 +60,32 @@ export function SatodimeUnlockPrompts() {
           setCvcRequest(info);
         }),
       confirmClaim: (info: SatodimeInfo) =>
-        new Promise<boolean>(resolve => {
+        confirm(
+          'Claim this Satodime?',
+          `This card has no owner. To sign, this app must claim it. ${claimConsequence(info)}`,
+          'Claim and sign',
+        ),
+      confirmUnseal: (info: SatodimeInfo, {claim}: {claim: boolean}) =>
+        confirm(
+          `Unseal vault #${info.vaultIndex + 1}?`,
+          [
+            'This vault is sealed: it must be unsealed to sign.',
+            'Unsealing cannot be undone: afterwards, anyone holding the card can spend from this vault.',
+            claim ? `The card has no owner: this app will first claim it. ${claimConsequence(info)}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n\n'),
+          'Unseal and sign',
+        ),
+      informOwnershipRequired: (info: SatodimeInfo) =>
+        new Promise<void>(resolve => {
           Alert.alert(
-            'Claim this Satodime?',
-            info.fixedUnlockSecret
-              ? 'This card has no owner. To sign, this app must claim it. Anyone holding the card and its engraved code can also take ownership.'
-              : 'This card has no owner. To sign, this app must claim it: it will then be the only app able to sign with this card. Ownership can be released later from the account screen.',
-            [
-              {text: 'Cancel', style: 'cancel', onPress: () => resolve(false)},
-              {text: 'Claim and sign', onPress: () => resolve(true)},
-            ],
-            {cancelable: true, onDismiss: () => resolve(false)},
+            'Card ownership required',
+            `Vault #${info.vaultIndex + 1} is sealed: it must be unsealed to sign, which requires the card ownership.\n\n` +
+              'This card is owned by another app. Release its ownership from that app (Satodime on mobile or ' +
+              'Satochip-Utils on desktop), then try again.',
+            [{text: 'OK', onPress: () => resolve()}],
+            {cancelable: true, onDismiss: () => resolve()},
           );
         }),
     });

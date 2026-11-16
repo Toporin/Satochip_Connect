@@ -67,7 +67,6 @@ export default function AccountDetail({ route, navigation }: Props) {
   );
   const satodimeInfo = isSatodime ? (walletInfo as SatodimeInfo) : undefined;
   const satodimeNetwork = satodimeInfo ? decodeSatodimeSlip44(satodimeInfo.slip44) : undefined;
-  const isWatchOnly = satodimeInfo !== undefined && satodimeInfo.vaultState !== SatodimeVaultState.UNSEALED;
 
   // Satodime ownership. CVC cards: the unlock code is engraved and never
   // changes, nothing to manage. Non-CVC cards: only the device that claimed
@@ -132,13 +131,13 @@ export default function AccountDetail({ route, navigation }: Props) {
       cardHasOwner: setupDone,
       vaultStates: { [satodimeInfo.vaultIndex]: vaultState },
     });
-    // non-CVC card owned by another app: cannot sign until released there
+    // non-CVC card owned by another app: cannot sign (nor unseal) until released there.
+    // A sealed vault can send: it is unsealed, with the user's permission, when signing.
     const ownedElsewhere = !fixedUnlockSecret && setupDone && !ownedByThisPhone;
-    const canSend = vaultState === SatodimeVaultState.UNSEALED && !ownedElsewhere;
     Toast.show({
-      type: canSend ? 'success' : 'info',
+      type: ownedElsewhere ? 'info' : 'success',
       text1: `Vault #${satodimeInfo.vaultIndex + 1}: ${SATODIME_VAULT_STATE_LABELS[vaultState]}${ownedElsewhere ? ' · owned by another app' : ''}`,
-      text2: canSend ? 'This account can send.' : 'This account stays watch-only.',
+      text2: ownedElsewhere ? 'This account stays watch-only.' : 'This account can send.',
     });
   }, [refreshUnlockCode, runWithSatodime, satodimeCard, satodimeInfo]);
 
@@ -540,24 +539,14 @@ export default function AccountDetail({ route, navigation }: Props) {
               styles.actionButton,
               { backgroundColor: Theme['accent-100'] }
             ]}
-            onPress={() => {
-              if (isWatchOnly) {
-                Alert.alert(
-                  'Watch-only vault',
-                  'This Satodime vault is sealed: it cannot sign. Unseal it in the Satodime app, then re-scan the card here.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Re-scan card', onPress: rescanSatodimeVault },
-                  ],
-                );
-                return;
-              }
+            onPress={() =>
+              // Satodime: a sealed vault is unsealed (with permission) when signing
               navigation.navigate('SendTransaction', {
                 accountId: accountId,
                 chainId: getDefaultChainId(),
                 chainIds: addressBalances.map(entry => entry.chainId),
-              });
-            }}
+              })
+            }
             activeOpacity={0.7}>
             <Text style={[styles.actionButtonText, { color: Theme['inverse-100'] }]}>
               Send
@@ -634,12 +623,8 @@ export default function AccountDetail({ route, navigation }: Props) {
             <View style={[styles.infoCard, { backgroundColor: Theme['bg-175'] }]}>
               {renderInfoField('Network', satodimeNetwork.label, false)}
               {renderInfoField('Vault', `#${satodimeInfo.vaultIndex + 1}`, false)}
-              {renderInfoField(
-                'State',
-                `${SATODIME_VAULT_STATE_LABELS[satodimeInfo.vaultState]}${isWatchOnly ? ' (watch-only)' : ''}`,
-                false,
-              )}
-              {isNotOwner ? renderInfoField('Ownership', 'Not owner (watch-only)', false) : null}
+              {renderInfoField('State', SATODIME_VAULT_STATE_LABELS[satodimeInfo.vaultState], false)}
+              {isNotOwner ? renderInfoField('Ownership', 'Watch-only', false) : null}
               {satodimeInfo.cardLabel ? renderInfoField('Card label', satodimeInfo.cardLabel, false) : null}
               {renderInfoField('Card authentikey', satodimeInfo.authentikey, true)}
             </View>

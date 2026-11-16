@@ -109,7 +109,7 @@ export default function AddSatodimeAccountScreen({ navigation }: Props) {
             • Satodime v0.2-0.1 or later is required to sign
           </Text>
           <Text style={[addAccountStyles.instructionItem, { color: Theme['fg-150'] }]}>
-            • Only unsealed vaults can sign; sealed vaults are added as watch-only
+            • Sealed vaults are unsealed (with your permission) when you first sign
           </Text>
           <Text style={[addAccountStyles.instructionItem, { color: Theme['fg-150'] }]}>
             • No PIN: the card unlock code (or the code engraved on the card) is asked when signing
