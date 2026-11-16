@@ -294,26 +294,43 @@ const SettingsStore = {
   },
 
   /**
-   * Update stored Satodime data after a card scan: the vault state of this
-   * account, and the CVC flag of every account of the same card.
+   * Update stored Satodime data after any scan of a card: the CVC flag and
+   * owner state of every account of the card, and the state of scanned vaults
+   * (by vault index). Only changed accounts are rewritten.
    */
-  updateSatodimeCardState(walletId: string, update: { vaultState: SatodimeVaultState; fixedUnlockSecret: boolean }) {
-    const wallet = state.wallets.get(walletId);
-    if (!wallet || wallet.type !== WalletType.SATODIME) {
-      return;
-    }
-    const authentikey = (wallet as ISatodimeWallet).satodimeInfo.authentikey.toLowerCase();
-    for (const other of this.getSatodimeWallets()) {
-      const info = other.satodimeInfo;
-      if (info.authentikey.toLowerCase() !== authentikey) {
+  updateSatodimeCardState(
+    authentikey: string,
+    update: {
+      fixedUnlockSecret?: boolean;
+      cardHasOwner?: boolean;
+      vaultStates?: Partial<Record<number, SatodimeVaultState>>;
+    },
+  ) {
+    const key = authentikey.toLowerCase();
+    let changed = false;
+    for (const wallet of this.getSatodimeWallets()) {
+      const info = wallet.satodimeInfo;
+      if (info.authentikey.toLowerCase() !== key) {
         continue;
       }
-      const vaultState = other.id === walletId ? update.vaultState : info.vaultState;
-      if (info.vaultState !== vaultState || info.fixedUnlockSecret !== update.fixedUnlockSecret) {
-        this.addWallet(new SatodimeWallet({ ...info, vaultState, fixedUnlockSecret: update.fixedUnlockSecret }));
+      const next = {
+        ...info,
+        fixedUnlockSecret: update.fixedUnlockSecret ?? info.fixedUnlockSecret,
+        cardHasOwner: update.cardHasOwner ?? info.cardHasOwner,
+        vaultState: update.vaultStates?.[info.vaultIndex] ?? info.vaultState,
+      };
+      if (
+        next.fixedUnlockSecret !== info.fixedUnlockSecret ||
+        next.cardHasOwner !== info.cardHasOwner ||
+        next.vaultState !== info.vaultState
+      ) {
+        this.addWallet(new SatodimeWallet(next));
+        changed = true;
       }
     }
-    this.saveSatodimeWallets();
+    if (changed) {
+      this.saveSatodimeWallets();
+    }
   },
 
   /**

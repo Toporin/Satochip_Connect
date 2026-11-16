@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   Text,
   View,
@@ -79,11 +80,14 @@ export default function AccountDetail({ route, navigation }: Props) {
     }
     setHasUnlockCode(await SecretStore.hasSatodimeUnlockSecret(satodimeAuthentikey));
   }, [satodimeAuthentikey]);
-  useEffect(() => {
-    refreshUnlockCode().catch(() => setHasUnlockCode(undefined));
-  }, [refreshUnlockCode]);
+  // re-read on focus: signing elsewhere can claim the card or delete its code
+  useFocusEffect(
+    useCallback(() => {
+      refreshUnlockCode().catch(() => setHasUnlockCode(undefined));
+    }, [refreshUnlockCode]),
+  );
   const isNonCvcCard = satodimeInfo?.fixedUnlockSecret === false;
-  /** Non-CVC card whose unlock code is held by another device (or nowhere): cannot sign */
+  /** Non-CVC card whose unlock code is not stored here: watch-only until this app claims it */
   const isNotOwner = isNonCvcCard && hasUnlockCode === false;
   const canReleaseOwnership = isNonCvcCard && hasUnlockCode === true;
 
@@ -122,13 +126,18 @@ export default function AccountDetail({ route, navigation }: Props) {
     if (!cardState) {
       return;
     }
-    const { vaultState, fixedUnlockSecret, ownedByThisPhone } = cardState;
-    SettingsStore.updateSatodimeCardState(satodimeInfo.id, { vaultState, fixedUnlockSecret });
-    const notOwner = !fixedUnlockSecret && !ownedByThisPhone;
-    const canSend = vaultState === SatodimeVaultState.UNSEALED && !notOwner;
+    const { vaultState, fixedUnlockSecret, ownedByThisPhone, setupDone } = cardState;
+    SettingsStore.updateSatodimeCardState(satodimeInfo.authentikey, {
+      fixedUnlockSecret,
+      cardHasOwner: setupDone,
+      vaultStates: { [satodimeInfo.vaultIndex]: vaultState },
+    });
+    // non-CVC card owned by another app: cannot sign until released there
+    const ownedElsewhere = !fixedUnlockSecret && setupDone && !ownedByThisPhone;
+    const canSend = vaultState === SatodimeVaultState.UNSEALED && !ownedElsewhere;
     Toast.show({
       type: canSend ? 'success' : 'info',
-      text1: `Vault #${satodimeInfo.vaultIndex + 1}: ${SATODIME_VAULT_STATE_LABELS[vaultState]}${notOwner ? ' · not owner' : ''}`,
+      text1: `Vault #${satodimeInfo.vaultIndex + 1}: ${SATODIME_VAULT_STATE_LABELS[vaultState]}${ownedElsewhere ? ' · owned by another app' : ''}`,
       text2: canSend ? 'This account can send.' : 'This account stays watch-only.',
     });
   }, [refreshUnlockCode, runWithSatodime, satodimeCard, satodimeInfo]);
@@ -532,17 +541,6 @@ export default function AccountDetail({ route, navigation }: Props) {
               { backgroundColor: Theme['accent-100'] }
             ]}
             onPress={() => {
-              if (isNotOwner) {
-                Alert.alert(
-                  'Watch-only account',
-                  'This phone is not the owner of this Satodime card: it cannot sign. Release ownership from the other device, then add the account again to claim it.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Re-scan card', onPress: rescanSatodimeVault },
-                  ],
-                );
-                return;
-              }
               if (isWatchOnly) {
                 Alert.alert(
                   'Watch-only vault',

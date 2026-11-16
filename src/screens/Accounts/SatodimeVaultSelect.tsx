@@ -39,6 +39,19 @@ export default function SatodimeVaultSelectScreen({ route, navigation }: Props) 
     return { selectable: true };
   };
 
+  // CVC card: the engraved code is asked when signing. Non-CVC card: depends
+  // on who owns the card (the unlock code is only known to the owner app).
+  const ownershipInfo: { text: string; warning: boolean } = scan.fixedUnlockSecret
+    ? { text: 'ⓘ The code engraved on this card (CVC) will be required to sign transactions.', warning: false }
+    : !scan.setupDone
+    ? { text: 'ⓘ This card has no owner. Ownership will be claimed by this app before the first signature.', warning: false }
+    : scan.ownership === 'owner'
+    ? { text: '✓ This app owns this card.', warning: false }
+    : {
+        text: '⚠ This card is owned by another app. Its ownership must be released from that app (e.g. Satodime on mobile or Satochip-Utils on desktop) before signing. The account stays watch-only until then.',
+        warning: true,
+      };
+
   const selectedVault = scan.vaults.find(v => v.index === selected);
   const canCreate =
     selectedVault !== undefined && availability(selectedVault).selectable && label.trim().length > 0;
@@ -60,6 +73,7 @@ export default function SatodimeVaultSelectScreen({ route, navigation }: Props) 
       vaultState: selectedVault.state,
       cardLabel: scan.label || undefined,
       fixedUnlockSecret: scan.fixedUnlockSecret,
+      cardHasOwner: scan.setupDone,
     };
     const wallet = SettingsStore.createSatodimeWallet(info);
     if (!wallet) {
@@ -98,6 +112,13 @@ export default function SatodimeVaultSelectScreen({ route, navigation }: Props) 
       <View style={[setupStyles.cardInfo, { backgroundColor: Theme['bg-175'] }]}>
         <Text style={[styles.small, { color: scan.isAuthentic ? Theme['fg-150'] : Theme['error-100'] }]}>
           {scan.isAuthentic ? '✓ Authentic Satodime' : `⚠ Authenticity not verified: ${scan.authenticityMsg}`}
+        </Text>
+      </View>
+
+      {/* What signing will require (unlock code / ownership) */}
+      <View style={[setupStyles.cardInfo, { backgroundColor: Theme['bg-175'] }]}>
+        <Text style={[styles.small, { color: ownershipInfo.warning ? Theme['error-100'] : Theme['fg-150'] }]}>
+          {ownershipInfo.text}
         </Text>
       </View>
 

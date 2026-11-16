@@ -12,6 +12,7 @@ import {SatodimeInfo, WalletError, WalletType} from '@/types/WalletTypes';
 import {SatochipWallet} from '@/wallets/satochip/SatochipWallet';
 import {EIP155SoftwareWallet} from '@/wallets/EIP155SoftwareWallet';
 import {signDigestWithSatodime} from '@/wallets/satodime/SatodimeClient';
+import {runSatodimeSigning} from '@/wallets/satodime/runSatodimeSigning';
 import {PresetsUtil} from '@/utils/PresetsUtil';
 import {ActionButton} from '@/components/ActionButton';
 import {Chains} from '@/components/Modal/Chains';
@@ -102,8 +103,8 @@ export default function ReviewScreen({route, navigation}: Props) {
         } else if (wallet.type === WalletType.SATODIME) {
           // card, vault key and unsealed-state checks happen in signDigestWithSatodime
           const info = wallet.getWalletInfo() as SatodimeInfo;
-          const der = await withCard(() =>
-            signDigestWithSatodime(card as SatodimeCard, info, Buffer.from(hash.slice(2), 'hex')),
+          const der = await runSatodimeSigning(info, card as SatodimeCard, withModal, closeNfc, options =>
+            signDigestWithSatodime(card as SatodimeCard, info, Buffer.from(hash.slice(2), 'hex'), options),
           );
           sig = await finalizeSignature(hash, der, account.address, dataType, chainId);
         } else if (wallet instanceof EIP155SoftwareWallet) {
@@ -138,7 +139,7 @@ export default function ReviewScreen({route, navigation}: Props) {
         setSigning(false);
       }
     },
-    [parsed, wallet, walletType, withCard, card, closeNfc, navigation],
+    [parsed, wallet, walletType, withCard, withModal, card, closeNfc, navigation],
   );
 
   /** Satochip: PIN. Software: password unless already unlocked. Satodime: no PIN. */

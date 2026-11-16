@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { SatodimeCard } from 'satochip-react-native';
 
@@ -7,17 +7,34 @@ import { useTheme } from '@/hooks/useTheme';
 import { AccountsStackScreenProps } from '@/utils/TypesUtil';
 import NfcPrompt from '@/components/NfcPromptAndroid';
 import useSatochipModal from '@/hooks/useSatochipModal';
-import {
-  ScannedSatodime,
-  claimSatodime,
-  registerSatodimeCvc,
-  scanSatodime,
-} from '@/wallets/satodime/SatodimeClient';
+import { ScannedSatodime, scanSatodime } from '@/wallets/satodime/SatodimeClient';
+import SettingsStore from '@/store/SettingsStore';
+import { SatodimeVaultState } from '@/types/WalletTypes';
 import { handleSatodimeError } from '@/wallets/satodime/satodimeNfc';
 import addAccountStyles from './addAccountStyles';
-import setupStyles from './setupStyles';
 
 type Props = AccountsStackScreenProps<'AddSatodimeAccount'>;
+
+/** Opportunistic update of accounts already added from this card. */
+function updateKnownAccounts(scan: ScannedSatodime): void {
+  const vaultStates: Partial<Record<number, SatodimeVaultState>> = {};
+  for (const account of SettingsStore.getSatodimeWallets()) {
+    const info = account.satodimeInfo;
+    if (info.authentikey.toLowerCase() !== scan.authentikey.toLowerCase()) {
+      continue;
+    }
+    const vault = scan.vaults.find(v => v.index === info.vaultIndex);
+    // only if the vault still holds the account key (not reset and sealed again)
+    if (vault?.pubkey && vault.pubkey.toLowerCase() === info.pubkey.toLowerCase()) {
+      vaultStates[info.vaultIndex] = vault.state;
+    }
+  }
+  SettingsStore.updateSatodimeCardState(scan.authentikey, {
+    fixedUnlockSecret: scan.fixedUnlockSecret,
+    cardHasOwner: scan.setupDone,
+    vaultStates,
+  });
+}
 
 export default function AddSatodimeAccountScreen({ navigation }: Props) {
   const Theme = useTheme();
@@ -25,9 +42,6 @@ export default function AddSatodimeAccountScreen({ navigation }: Props) {
   const { withModal, nfcVisible, closeNfc } = useSatochipModal(card);
 
   const [busy, setBusy] = useState(false);
-  // scan waiting for an ownership step (CVC entry or refusal message)
-  const [pendingScan, setPendingScan] = useState<ScannedSatodime | null>(null);
-  const [cvc, setCvc] = useState('');
 
   /** Run an NFC operation with the Android prompt, error toast and session cleanup. */
   const runWithCard = useCallback(
@@ -52,70 +66,22 @@ export default function AddSatodimeAccountScreen({ navigation }: Props) {
     [card, closeNfc, withModal],
   );
 
-  const goToVaults = useCallback(
-    (scan: ScannedSatodime) => {
-      setPendingScan(null);
-      setCvc('');
-      navigation.navigate('SatodimeVaultSelect', { scan });
-    },
-    [navigation],
-  );
-
-  const claimOwnership = useCallback(
-    async (scan: ScannedSatodime) => {
-      const done = await runWithCard(async () => {
-        await claimSatodime(card, scan.authentikey);
-        return true;
-      }, 'Failed to claim the card');
-      if (done) {
-        Toast.show({ type: 'success', text1: 'You are now the owner of this Satodime' });
-        goToVaults({ ...scan, ownership: 'owner', setupDone: true });
-      }
-    },
-    [card, goToVaults, runWithCard],
-  );
-
+  /**
+   * Scan, then go to the vault list. Ownership is not needed to add a vault
+   * (v0.2 cards disclose vault public data to anyone): the unlock code is
+   * obtained when signing (CVC prompt, or claim of an ownerless card).
+   */
   const handleScanCard = useCallback(async () => {
     const scan = await runWithCard(() => scanSatodime(card), 'Failed to read the card');
     if (!scan) {
       return;
     }
-    console.info(`[Satodime] card scanned: ${scan.versionLabel}, ${scan.vaults.length} vault(s), ownership=${scan.ownership}`);
-
-    if (!scan.supportsHashSigning || scan.ownership === 'owner') {
-      // unsupported versions are explained on the vault screen
-      goToVaults(scan);
-      return;
-    }
-    if (scan.ownership === 'unclaimed') {
-      Alert.alert(
-        'Claim this Satodime?',
-        scan.fixedUnlockSecret
-          ? 'This card has no owner. Claiming it makes this phone an owner. This card has an engraved code: anyone holding the card and its code can also take ownership. You will need to tap the card again.'
-          : 'This card has no owner. Claiming it makes this phone its owner: only this phone will be able to sign with its vaults. You will need to tap the card again.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Claim', onPress: () => claimOwnership(scan) },
-        ],
-      );
-      return;
-    }
-    // 'cvc-required' or 'owned-elsewhere': shown below
-    setPendingScan(scan);
-  }, [card, claimOwnership, goToVaults, runWithCard]);
-
-  const handleSubmitCvc = useCallback(async () => {
-    if (!pendingScan) {
-      return;
-    }
-    const done = await runWithCard(async () => {
-      await registerSatodimeCvc(card, pendingScan.authentikey, cvc);
-      return true;
-    }, 'Card code not accepted');
-    if (done) {
-      goToVaults({ ...pendingScan, ownership: 'owner' });
-    }
-  }, [card, cvc, goToVaults, pendingScan, runWithCard]);
+    console.info(
+      `[Satodime] card scanned: ${scan.versionLabel}, ${scan.vaults.length} vault(s), cvc=${scan.fixedUnlockSecret}, owner=${scan.setupDone}, ownership=${scan.ownership}`,
+    );
+    updateKnownAccounts(scan);
+    navigation.navigate('SatodimeVaultSelect', { scan });
+  }, [card, navigation, runWithCard]);
 
   const scanDisabled = busy;
 
@@ -146,58 +112,10 @@ export default function AddSatodimeAccountScreen({ navigation }: Props) {
             • Only unsealed vaults can sign; sealed vaults are added as watch-only
           </Text>
           <Text style={[addAccountStyles.instructionItem, { color: Theme['fg-150'] }]}>
-            • No PIN is needed: whoever holds the card and its unlock code controls unsealed vaults
+            • No PIN: the card unlock code (or the code engraved on the card) is asked when signing
           </Text>
         </View>
       </View>
-
-      {pendingScan?.ownership === 'cvc-required' && (
-        <View style={[addAccountStyles.instructionCard, { backgroundColor: Theme['bg-175'] }]}>
-          <Text style={[addAccountStyles.instructionTitle, { color: Theme['fg-100'] }]}>Card code required</Text>
-          <Text style={[addAccountStyles.instructionItem, { color: Theme['fg-150'] }]}>
-            This card belongs to another device. Enter the code printed on the card to use it from this phone,
-            then tap the card again.
-          </Text>
-          <TextInput
-            style={[
-              setupStyles.textInput,
-              styles.spaced,
-              { backgroundColor: Theme['bg-150'], color: Theme['fg-100'], borderColor: Theme['bg-250'] },
-            ]}
-            placeholder="Card code"
-            placeholderTextColor={Theme['fg-300']}
-            value={cvc}
-            onChangeText={setCvc}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={20}
-          />
-          <TouchableOpacity
-            style={[
-              addAccountStyles.scanButton,
-              styles.spaced,
-              { backgroundColor: busy || !cvc.trim() ? Theme['bg-250'] : Theme['accent-100'] },
-            ]}
-            onPress={handleSubmitCvc}
-            disabled={busy || !cvc.trim()}>
-            <Text style={[addAccountStyles.scanButtonText, { color: busy || !cvc.trim() ? Theme['fg-300'] : Theme['inverse-100'] }]}>
-              Verify code
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {pendingScan?.ownership === 'owned-elsewhere' && (
-        <View style={[addAccountStyles.instructionCard, { backgroundColor: Theme['bg-175'] }]}>
-          <Text style={[addAccountStyles.instructionTitle, { color: Theme['error-100'] }]}>Card owned by another device</Text>
-          <Text style={[addAccountStyles.instructionItem, { color: Theme['fg-150'] }]}>
-            This Satodime belongs to another device. Release its ownership from that device first (transfer ownership
-            in the Satodime app), then scan it again here.
-          </Text>
-        </View>
-      )}
 
       <View style={addAccountStyles.scanSection}>
         <TouchableOpacity
@@ -221,8 +139,3 @@ export default function AddSatodimeAccountScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  spaced: {
-    marginTop: 12,
-  },
-});

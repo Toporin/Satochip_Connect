@@ -224,10 +224,52 @@ export async function registerSatodimeCvc(card: SatodimeCard, expectedAuthentike
  *  5. this device holds the card unlock secret.
  * Returns the DER signature from the card.
  */
+/** What a signature needs from the user before it can be retried. */
+export type SatodimeUnlockKind = 'cvc' | 'claim';
+
+/**
+ * Raised inside the NFC session when signing needs user input (the engraved
+ * CVC, or permission to claim an ownerless card). The caller asks the user
+ * outside the NFC session and retries (see satodimeUnlock.ts).
+ */
+export class SatodimeUnlockRequired extends Error {
+  readonly kind: SatodimeUnlockKind;
+  constructor(kind: SatodimeUnlockKind) {
+    super(kind === 'cvc' ? 'The code engraved on the card is required to sign.' : 'This card has no owner: it must be claimed to sign.');
+    this.name = 'SatodimeUnlockRequired';
+    this.kind = kind;
+  }
+}
+
+/** Card state observed during a scan, to update stored accounts opportunistically. */
+export interface SatodimeObservedState {
+  /** CVC card: the unlock code is engraved and fixed */
+  fixedUnlockSecret: boolean;
+  /** card set up (has an owner) */
+  cardHasOwner: boolean;
+  /** state of the account's vault */
+  vaultState: SatodimeVaultState;
+}
+
+export interface SatodimeSignOptions {
+  /** CVC typed by the user (CVC cards without a stored code) */
+  cvc?: string;
+  /** the user agreed to claim the card if it has no owner */
+  allowClaim?: boolean;
+  /** called with the card state read during the session */
+  onCardState?: (state: SatodimeObservedState) => void;
+}
+
+/** checkUnlockCode() is false for 9C50 and 9C51: retry once to rule out a counter desync. */
+async function checkUnlockCodeTwice(card: SatodimeCard): Promise<boolean> {
+  return (await card.checkUnlockCode()) || (await card.checkUnlockCode());
+}
+
 export async function signDigestWithSatodime(
   card: SatodimeCard,
   info: SatodimeInfo,
   digest: Buffer,
+  options: SatodimeSignOptions = {},
 ): Promise<Buffer> {
   const status = await card.getStatus();
   if (!card.supportsHashSigning(status)) {
@@ -253,9 +295,44 @@ export async function signDigestWithSatodime(
     throw new Error(`Vault #${info.vaultIndex + 1} holds a different key than this account (the vault was reset and sealed again).`);
   }
 
-  const secret = await SecretStore.getSatodimeUnlockSecret(info.authentikey);
+  // Ownership / unlock code (state also reported for opportunistic updates)
+  const satodimeStatus = await card.getSatodimeStatus();
+  const isCvcCard = satodimeStatus.fixedUnlockSecret === true;
+  options.onCardState?.({ fixedUnlockSecret: isCvcCard, cardHasOwner: status.setupDone, vaultState });
+
+  if (!status.setupDone) {
+    if (!options.allowClaim) {
+      throw new SatodimeUnlockRequired('claim');
+    }
+    // SETUP returns the unlock code (on a CVC card, the engraved code itself)
+    const ownership = await card.claimOwnership();
+    await SecretStore.setSatodimeUnlockSecret(info.authentikey, ownership.unlockSecret);
+    options.onCardState?.({ fixedUnlockSecret: isCvcCard, cardHasOwner: true, vaultState });
+  }
+
+  let secret = await SecretStore.getSatodimeUnlockSecret(info.authentikey);
+  if (!secret && isCvcCard) {
+    if (!options.cvc) {
+      throw new SatodimeUnlockRequired('cvc');
+    }
+    let candidate: Buffer;
+    try {
+      candidate = cvcToUnlockSecret(options.cvc);
+    } catch {
+      throw new Error('Invalid card code format.');
+    }
+    card.setUnlockSecret(candidate);
+    if (!(await checkUnlockCodeTwice(card))) {
+      card.setUnlockSecret(null);
+      throw new Error('Incorrect card code. Check the code engraved on the card. Nothing was signed.');
+    }
+    await SecretStore.setSatodimeUnlockSecret(info.authentikey, candidate);
+    secret = candidate;
+  }
   if (!secret) {
-    throw new Error('This device is not the owner of this Satodime card. Add the account again to claim ownership or enter the card code.');
+    throw new Error(
+      'This card is owned by another app. Release its ownership from that app (e.g. Satodime on mobile or Satochip-Utils on desktop), then try again.',
+    );
   }
   card.setUnlockSecret(secret);
 
@@ -264,9 +341,13 @@ export async function signDigestWithSatodime(
   } catch (error) {
     const sw = statusWordOf(error);
     if (sw === SW_INCORRECT_UNLOCK_CODE) {
-      // wrong unlock code: the card changed owner, the stored code is useless
+      // wrong unlock code: the stored code is useless
       await SecretStore.deleteSatodimeUnlockSecret(info.authentikey);
-      throw new Error('This device is not (or no longer) the owner of this Satodime card.');
+      throw new Error(
+        isCvcCard
+          ? 'The stored card code is wrong and was removed. Sign again to enter the code engraved on the card.'
+          : 'This device is not (or no longer) the owner of this Satodime card.',
+      );
     }
     if (sw === SW_INCORRECT_UNLOCK_COUNTER) {
       // transient: keep the stored code

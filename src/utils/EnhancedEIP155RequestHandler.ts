@@ -26,6 +26,7 @@ import { EIP155_SIGNING_METHODS } from '@/constants/Eip155';
 import SettingsStore from '@/store/SettingsStore.ts';
 import { SatochipWallet } from '@/wallets/satochip/SatochipWallet.ts';
 import { SatodimeWallet } from '@/wallets/satodime/SatodimeWallet';
+import { runSatodimeSigning } from '@/wallets/satodime/runSatodimeSigning';
 import { EIP155SoftwareWallet } from '@/wallets/EIP155SoftwareWallet.ts';
 import { extractChainId, broadcastTransaction } from '@/utils/EIP155Utils';
 
@@ -136,14 +137,10 @@ export async function approveEIP155RequestEnhanced(
             ),
           )();
         } else if (wallet.type === WalletType.SATODIME) {
-          signedMessage = await withModal(async () =>
-            (wallet as SatodimeWallet).signEthereumMessage(
-              message,
-              card as SatodimeCard,
-              address,
-              chainId,
-            ),
-          )();
+          const satodime = wallet as SatodimeWallet;
+          signedMessage = await runSatodimeSigning(satodime.satodimeInfo, card as SatodimeCard, withModal, closeNfc, options =>
+            satodime.signEthereumMessage(message, card as SatodimeCard, address, chainId, options),
+          );
         } else {
           // software wallet
           signedMessage = await (wallet as ISoftwareWallet).signMessage(
@@ -177,16 +174,10 @@ export async function approveEIP155RequestEnhanced(
             ),
           )();
         } else if (wallet.type === WalletType.SATODIME) {
-          signedData = await withModal(async () =>
-            (wallet as SatodimeWallet).signEIP712TypedData(
-              domain,
-              types,
-              data,
-              card as SatodimeCard,
-              address,
-              chainId,
-            ),
-          )();
+          const satodime = wallet as SatodimeWallet;
+          signedData = await runSatodimeSigning(satodime.satodimeInfo, card as SatodimeCard, withModal, closeNfc, options =>
+            satodime.signEIP712TypedData(domain, types, data, card as SatodimeCard, address, chainId, options),
+          );
         } else {
           // Software wallets can handle typed data directly
           signedData = await (wallet as ISoftwareWallet).signTypedData(
@@ -220,14 +211,10 @@ export async function approveEIP155RequestEnhanced(
             ),
           )();
         } else if (wallet.type === WalletType.SATODIME) {
-          signedTx = await withModal(async () =>
-            (wallet as SatodimeWallet).signEthereumTransaction(
-              validatedTransaction,
-              card as SatodimeCard,
-              address,
-              chainId,
-            ),
-          )();
+          const satodime = wallet as SatodimeWallet;
+          signedTx = await runSatodimeSigning(satodime.satodimeInfo, card as SatodimeCard, withModal, closeNfc, options =>
+            satodime.signEthereumTransaction(validatedTransaction, card as SatodimeCard, address, chainId, options),
+          );
         } else {
           // Software wallets can handle full transaction objects
           signedTx = await (wallet as ISoftwareWallet).signTransaction(

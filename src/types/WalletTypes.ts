@@ -59,6 +59,8 @@ export interface SatodimeInfo extends WalletInfo {
    * Undefined for accounts added before this was recorded.
    */
   fixedUnlockSecret?: boolean;
+  /** The card had an owner (setup done) at the last scan. Undefined if unknown. */
+  cardHasOwner?: boolean;
 }
 
 export interface SoftwareWalletInfo extends WalletInfo {

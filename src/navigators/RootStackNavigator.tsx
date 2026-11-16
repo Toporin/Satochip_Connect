@@ -5,6 +5,7 @@ import {HomeTabNavigator} from './HomeTabNavigator';
 import SessionDetail from '@/screens/SessionDetail';
 import Scan from '@/screens/Scan';
 import Modal from '@/components/Modal';
+import {SatodimeUnlockPrompts} from '@/components/SatodimeUnlockPrompts';
 import {useTheme} from '@/hooks/useTheme';
 import {LogList} from '@/screens/LogList';
 import {AppLogs} from '@/screens/AppLogs';
@@ -26,6 +27,7 @@ export function RootStackNavigator() {
   return (
     <>
       <Modal />
+      <SatodimeUnlockPrompts />
       <StackNavigator.Navigator
         screenOptions={{
           headerShown: false,

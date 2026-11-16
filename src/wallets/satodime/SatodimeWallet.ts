@@ -18,7 +18,7 @@ import {
 import { NFCManager } from '@/wallets/nfc/NFCManager';
 import { TransactionRequest } from '@/utils/EIP155Utils';
 import { decodeSatodimeSlip44, SatodimeNetwork } from '@/constants/Satodime';
-import { signDigestWithSatodime } from './SatodimeClient';
+import { SatodimeSignOptions, SatodimeUnlockRequired, signDigestWithSatodime } from './SatodimeClient';
 import {
   DigestSigner,
   signMessageWithDigestSigner,
@@ -54,19 +54,28 @@ export class SatodimeWallet implements ISatodimeWallet {
     return this.satodimeInfo.vaultState !== SatodimeVaultState.UNSEALED;
   }
 
-  private cardSigner(card: SatodimeCard): DigestSigner {
-    return (digest: Buffer) => signDigestWithSatodime(card, this.satodimeInfo, digest);
+  private cardSigner(card: SatodimeCard, options?: SatodimeSignOptions): DigestSigner {
+    return (digest: Buffer) => signDigestWithSatodime(card, this.satodimeInfo, digest, options);
   }
 
-  private wrapError(what: string, error: unknown): WalletError {
+  private wrapError(what: string, error: unknown): Error {
+    if (error instanceof SatodimeUnlockRequired) {
+      return error; // handled by signWithSatodimeUnlock (prompt + retry)
+    }
     const cause = error instanceof Error ? error : new Error(String(error));
     console.error(`[Satodime] ${what} failed: ${cause.message}`);
     return new WalletError(WalletErrorType.SIGNING_FAILED, cause.message, cause);
   }
 
-  public async signEthereumMessage(message: string, card: SatodimeCard, address: string, chainId: number): Promise<string> {
+  public async signEthereumMessage(
+    message: string,
+    card: SatodimeCard,
+    address: string,
+    chainId: number,
+    options?: SatodimeSignOptions,
+  ): Promise<string> {
     try {
-      return await signMessageWithDigestSigner(this.cardSigner(card), message, address, chainId);
+      return await signMessageWithDigestSigner(this.cardSigner(card, options), message, address, chainId);
     } catch (error) {
       throw this.wrapError('message signing', error);
     }
@@ -79,9 +88,10 @@ export class SatodimeWallet implements ISatodimeWallet {
     card: SatodimeCard,
     address: string,
     chainId: number,
+    options?: SatodimeSignOptions,
   ): Promise<string> {
     try {
-      return await signTypedDataWithDigestSigner(this.cardSigner(card), domain, types, data, address, chainId);
+      return await signTypedDataWithDigestSigner(this.cardSigner(card, options), domain, types, data, address, chainId);
     } catch (error) {
       throw this.wrapError('typed data signing', error);
     }
@@ -92,9 +102,10 @@ export class SatodimeWallet implements ISatodimeWallet {
     card: SatodimeCard,
     address: string,
     chainId: number,
+    options?: SatodimeSignOptions,
   ): Promise<string> {
     try {
-      return await signTransactionWithDigestSigner(this.cardSigner(card), transaction, address, chainId);
+      return await signTransactionWithDigestSigner(this.cardSigner(card, options), transaction, address, chainId);
     } catch (error) {
       throw this.wrapError('transaction signing', error);
     }

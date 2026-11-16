@@ -37,7 +37,9 @@ jest.mock('@/wallets/nfc/NFCManager', () => ({ NFCManager: { getInstance: () => 
 import { decodeSatodimeSlip44 } from '@/constants/Satodime';
 import { SatodimeInfo, SatodimeVaultState, WalletType } from '@/types/WalletTypes';
 import { SecretStore } from '@/utils/SecretStore';
+import { signWithSatodimeUnlock } from '@/wallets/satodime/satodimeUnlock';
 import {
+  SatodimeUnlockRequired,
   readSatodimeCardState,
   releaseSatodimeOwnership,
   satodimeAddressFromPubkey,
@@ -208,6 +210,7 @@ describe('card and vault checks before signing', () => {
       getSatodimeStatus: async () => ({ unlockCounter: Buffer.alloc(4), nbKeyslots: 3, keyslotStates: [2, 0, 0], fixedUnlockSecret: o.fixedUnlockSecret }),
       checkUnlockCode: jest.fn(async () => (checks.length > 0 ? checks.shift()! : false)),
       transferOwnership: jest.fn(async () => undefined),
+      claimOwnership: jest.fn(async () => ({ unlockCounter: Buffer.alloc(4), unlockSecret: Buffer.alloc(20, 7) })),
       supportsHashSigning: (s: { version: { protocolVersion: number } }) => s.version.protocolVersion >= 2,
       getAuthentikey: async () => ({ getPublicKeyBytes: () => Buffer.from(o.authentikey, 'hex') }),
       getKeyslotStatus: async () => ({ state: o.state }),
@@ -265,7 +268,7 @@ describe('card and vault checks before signing', () => {
   test('no stored unlock secret', async () => {
     mockKeychain.clear();
     const { card } = mockCard();
-    await expect(signDigestWithSatodime(card, info, digest)).rejects.toThrow(/not the owner/);
+    await expect(signDigestWithSatodime(card, info, digest)).rejects.toThrow(/owned by another app/);
   });
 
   test('counter out of sync (9C50): the secret is kept', async () => {
@@ -339,6 +342,88 @@ describe('card and vault checks before signing', () => {
       for (const m of [cvc, wrong, released, notOwner]) {
         expect(m.card.transferOwnership).not.toHaveBeenCalled();
       }
+    });
+  });
+
+  describe('unlock code on demand', () => {
+    test('ownerless card: claim required, then claimed with permission', async () => {
+      mockKeychain.clear();
+      const { card } = mockCard({ setupDone: false });
+      await expect(signDigestWithSatodime(card, info, digest)).rejects.toBeInstanceOf(SatodimeUnlockRequired);
+      expect(card.claimOwnership).not.toHaveBeenCalled();
+      const states: unknown[] = [];
+      const der = await signDigestWithSatodime(card, info, digest, { allowClaim: true, onCardState: st => states.push(st) });
+      expect(der[0]).toBe(0x30);
+      expect(card.claimOwnership).toHaveBeenCalledTimes(1);
+      expect((await SecretStore.getSatodimeUnlockSecret(AUTHENTIKEY))?.toString('hex')).toBe('07'.repeat(20));
+      expect(states).toEqual([
+        { fixedUnlockSecret: false, cardHasOwner: false, vaultState: 2 },
+        { fixedUnlockSecret: false, cardHasOwner: true, vaultState: 2 },
+      ]);
+    });
+
+    test('CVC card without stored code: CVC required, wrong code refused, right code stored', async () => {
+      mockKeychain.clear();
+      const required = mockCard({ fixedUnlockSecret: true });
+      await expect(signDigestWithSatodime(required.card, info, digest)).rejects.toMatchObject({ kind: 'cvc' });
+
+      const wrong = mockCard({ fixedUnlockSecret: true, checkResults: [false, false] });
+      await expect(signDigestWithSatodime(wrong.card, info, digest, { cvc: 'BAD' })).rejects.toThrow(/Incorrect card code/);
+      expect(wrong.card.signTransactionHash).not.toHaveBeenCalled();
+      expect(await SecretStore.hasSatodimeUnlockSecret(AUTHENTIKEY)).toBe(false);
+
+      const right = mockCard({ fixedUnlockSecret: true, checkResults: [true] });
+      await signDigestWithSatodime(right.card, info, digest, { cvc: 'ABC123' });
+      expect(right.card.signTransactionHash).toHaveBeenCalledTimes(1);
+      const stored = await SecretStore.getSatodimeUnlockSecret(AUTHENTIKEY);
+      expect(stored?.subarray(0, 6).toString()).toBe('ABC123');
+    });
+
+    test('9C51 on a CVC card: code removed, message asks to enter it again', async () => {
+      const { card } = mockCard({ fixedUnlockSecret: true, signError: { statusWord: 0x9c51 } });
+      await expect(signDigestWithSatodime(card, info, digest)).rejects.toThrow(/enter the code engraved/);
+      expect(await SecretStore.hasSatodimeUnlockSecret(AUTHENTIKEY)).toBe(false);
+    });
+
+    function fakePrompts(cvc: string | null = 'ABC123', claim = true) {
+      return { requestCvc: jest.fn(async () => cvc), confirmClaim: jest.fn(async () => claim) };
+    }
+
+    test('known CVC card without code: prompt before the first attempt', async () => {
+      mockKeychain.clear();
+      const prompts = fakePrompts();
+      const attempt = jest.fn(async () => 'ok');
+      await expect(signWithSatodimeUnlock({ ...info, fixedUnlockSecret: true }, attempt, prompts)).resolves.toBe('ok');
+      expect(prompts.requestCvc).toHaveBeenCalledTimes(1);
+      expect(attempt).toHaveBeenCalledWith({ cvc: 'ABC123' });
+    });
+
+    test('known ownerless card: claim confirmation before the first attempt', async () => {
+      mockKeychain.clear();
+      const prompts = fakePrompts();
+      const attempt = jest.fn(async () => 'ok');
+      await signWithSatodimeUnlock({ ...info, fixedUnlockSecret: false, cardHasOwner: false }, attempt, prompts);
+      expect(prompts.confirmClaim).toHaveBeenCalledTimes(1);
+      expect(attempt).toHaveBeenCalledWith({ allowClaim: true });
+    });
+
+    test('stale state: one retry after the matching prompt', async () => {
+      const prompts = fakePrompts();
+      const attempt = jest
+        .fn()
+        .mockRejectedValueOnce(new SatodimeUnlockRequired('claim'))
+        .mockResolvedValueOnce('signed');
+      await expect(signWithSatodimeUnlock(info, attempt, prompts)).resolves.toBe('signed');
+      expect(prompts.confirmClaim).toHaveBeenCalledTimes(1);
+      expect(attempt).toHaveBeenNthCalledWith(1, {});
+      expect(attempt).toHaveBeenNthCalledWith(2, { allowClaim: true });
+    });
+
+    test('declined prompt: cancelled, no second attempt', async () => {
+      const prompts = fakePrompts(null, false);
+      const attempt = jest.fn().mockRejectedValueOnce(new SatodimeUnlockRequired('cvc'));
+      await expect(signWithSatodimeUnlock(info, attempt, prompts)).rejects.toThrow(/cancelled/);
+      expect(attempt).toHaveBeenCalledTimes(1);
     });
   });
 });
