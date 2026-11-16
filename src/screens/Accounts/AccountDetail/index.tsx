@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   Text,
   View,
@@ -23,7 +23,8 @@ import { SatodimeCard } from 'satochip-react-native';
 import useSatochipModal from '@/hooks/useSatochipModal';
 import NfcPrompt from '@/components/NfcPromptAndroid';
 import { decodeSatodimeSlip44, SATODIME_VAULT_STATE_LABELS } from '@/constants/Satodime';
-import { readSatodimeVaultState } from '@/wallets/satodime/SatodimeClient';
+import { readSatodimeCardState, releaseSatodimeOwnership } from '@/wallets/satodime/SatodimeClient';
+import { SecretStore } from '@/utils/SecretStore';
 import { handleSatodimeError } from '@/wallets/satodime/satodimeNfc';
 import BalanceTable from '@/components/BalanceTable';
 import NftTable from '@/components/NftTable';
@@ -67,32 +68,97 @@ export default function AccountDetail({ route, navigation }: Props) {
   const satodimeNetwork = satodimeInfo ? decodeSatodimeSlip44(satodimeInfo.slip44) : undefined;
   const isWatchOnly = satodimeInfo !== undefined && satodimeInfo.vaultState !== SatodimeVaultState.UNSEALED;
 
-  // Satodime: re-scan the card to refresh the vault state (e.g. after unsealing it in the Satodime app)
+  // Satodime ownership. CVC cards: the unlock code is engraved and never
+  // changes, nothing to manage. Non-CVC cards: only the device that claimed
+  // the card holds its unlock code (kept in the keychain).
+  const satodimeAuthentikey = satodimeInfo?.authentikey;
+  const [hasUnlockCode, setHasUnlockCode] = useState<boolean | undefined>(undefined);
+  const refreshUnlockCode = useCallback(async () => {
+    if (!satodimeAuthentikey) {
+      return;
+    }
+    setHasUnlockCode(await SecretStore.hasSatodimeUnlockSecret(satodimeAuthentikey));
+  }, [satodimeAuthentikey]);
+  useEffect(() => {
+    refreshUnlockCode().catch(() => setHasUnlockCode(undefined));
+  }, [refreshUnlockCode]);
+  const isNonCvcCard = satodimeInfo?.fixedUnlockSecret === false;
+  /** Non-CVC card whose unlock code is held by another device (or nowhere): cannot sign */
+  const isNotOwner = isNonCvcCard && hasUnlockCode === false;
+  const canReleaseOwnership = isNonCvcCard && hasUnlockCode === true;
+
+  // Satodime: re-scan the card to refresh the vault state (e.g. after unsealing
+  // it in the Satodime app), the CVC flag and the ownership
   const satodimeCard = useRef(new SatodimeCard()).current;
   const { withModal, nfcVisible, closeNfc } = useSatochipModal(satodimeCard);
+  const runWithSatodime = useCallback(
+    async <T,>(operation: () => Promise<T>, errorTitle: string): Promise<T | undefined> => {
+      try {
+        const run = withModal(operation);
+        if (!run) {
+          throw new Error('NFC is not supported on this platform');
+        }
+        return (await run()) as T;
+      } catch (error) {
+        Toast.show({ type: 'error', text1: errorTitle, text2: handleSatodimeError(error) });
+        return undefined;
+      } finally {
+        closeNfc();
+        await satodimeCard.endNfcSession().catch(() => undefined);
+      }
+    },
+    [closeNfc, satodimeCard, withModal],
+  );
+
   const rescanSatodimeVault = useCallback(async () => {
     if (!satodimeInfo) {
       return;
     }
-    try {
-      const run = withModal(() => readSatodimeVaultState(satodimeCard, satodimeInfo));
-      if (!run) {
-        throw new Error('NFC is not supported on this platform');
-      }
-      const state = (await run()) as SatodimeVaultState;
-      SettingsStore.updateSatodimeVaultState(satodimeInfo.id, state);
-      Toast.show({
-        type: state === SatodimeVaultState.UNSEALED ? 'success' : 'info',
-        text1: `Vault #${satodimeInfo.vaultIndex + 1}: ${SATODIME_VAULT_STATE_LABELS[state]}`,
-        text2: state === SatodimeVaultState.UNSEALED ? 'This account can now send.' : 'This account stays watch-only.',
-      });
-    } catch (error) {
-      Toast.show({ type: 'error', text1: 'Failed to read the card', text2: handleSatodimeError(error) });
-    } finally {
-      closeNfc();
-      await satodimeCard.endNfcSession().catch(() => undefined);
+    const cardState = await runWithSatodime(
+      () => readSatodimeCardState(satodimeCard, satodimeInfo),
+      'Failed to read the card',
+    );
+    await refreshUnlockCode();
+    if (!cardState) {
+      return;
     }
-  }, [closeNfc, satodimeCard, satodimeInfo, withModal]);
+    const { vaultState, fixedUnlockSecret, ownedByThisPhone } = cardState;
+    SettingsStore.updateSatodimeCardState(satodimeInfo.id, { vaultState, fixedUnlockSecret });
+    const notOwner = !fixedUnlockSecret && !ownedByThisPhone;
+    const canSend = vaultState === SatodimeVaultState.UNSEALED && !notOwner;
+    Toast.show({
+      type: canSend ? 'success' : 'info',
+      text1: `Vault #${satodimeInfo.vaultIndex + 1}: ${SATODIME_VAULT_STATE_LABELS[vaultState]}${notOwner ? ' · not owner' : ''}`,
+      text2: canSend ? 'This account can send.' : 'This account stays watch-only.',
+    });
+  }, [refreshUnlockCode, runWithSatodime, satodimeCard, satodimeInfo]);
+
+  const releaseOwnership = useCallback(() => {
+    if (!satodimeInfo) {
+      return;
+    }
+    Alert.alert(
+      'Release ownership?',
+      'Anyone can then claim the card, and a new unlock code will be created. This phone will no longer be able to sign with any vault of this card until it claims it again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Release',
+          style: 'destructive',
+          onPress: async () => {
+            const done = await runWithSatodime(async () => {
+              await releaseSatodimeOwnership(satodimeCard, satodimeInfo);
+              return true;
+            }, 'Failed to release ownership');
+            await refreshUnlockCode();
+            if (done) {
+              Toast.show({ type: 'success', text1: 'Ownership released', text2: 'The card can now be claimed by another device.' });
+            }
+          },
+        },
+      ],
+    );
+  }, [refreshUnlockCode, runWithSatodime, satodimeCard, satodimeInfo]);
 
   // Filter token balances for this wallet address, by chainId (non-zero, no error)
   const addressTokenBalances = useMemo((): Map<number, TokenBalanceEntry[]> => {
@@ -269,7 +335,44 @@ export default function AccountDetail({ route, navigation }: Props) {
     });
   };
 
-  const handleDeleteClick = () => {
+  const handleDeleteClick = async () => {
+    // Satodime: the card ownership matters only when deleting the last account
+    // of the card managed by the app; other accounts of the card keep using
+    // the unlock code.
+    const authentikey = satodimeInfo?.authentikey.toLowerCase();
+    const isLastAccountOfCard =
+      authentikey !== undefined &&
+      !SettingsStore.getSatodimeWallets().some(
+        w => w.id !== accountId && w.satodimeInfo.authentikey.toLowerCase() === authentikey,
+      );
+    if (satodimeInfo && isLastAccountOfCard) {
+      // read the keychain now: the cached state may not be loaded yet
+      const ownsCard = await SecretStore.hasSatodimeUnlockSecret(satodimeInfo.authentikey).catch(() => false);
+      if (ownsCard && satodimeInfo.fixedUnlockSecret === undefined) {
+        // account added before the card type was recorded
+        Alert.alert(
+          'Re-scan the card first',
+          'This phone holds the unlock code of this Satodime card. Re-scan the card so the app can check whether its code is engraved on the card before deleting the account.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Re-scan card', onPress: rescanSatodimeVault },
+          ],
+        );
+        return;
+      }
+      if (ownsCard && satodimeInfo.fixedUnlockSecret === false) {
+        // non-CVC card owned here: its unlock code exists nowhere else
+        Alert.alert(
+          'Release ownership first',
+          'This is the last account of this Satodime card in the app. This phone owns the card, and its unlock code exists only on this phone. Release the card ownership before deleting the account, otherwise nobody could manage the card anymore.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Release ownership', onPress: releaseOwnership },
+          ],
+        );
+        return;
+      }
+    }
     setShowDeleteModal(true);
   };
 
@@ -429,6 +532,17 @@ export default function AccountDetail({ route, navigation }: Props) {
               { backgroundColor: Theme['accent-100'] }
             ]}
             onPress={() => {
+              if (isNotOwner) {
+                Alert.alert(
+                  'Watch-only account',
+                  'This phone is not the owner of this Satodime card: it cannot sign. Release ownership from the other device, then add the account again to claim it.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Re-scan card', onPress: rescanSatodimeVault },
+                  ],
+                );
+                return;
+              }
               if (isWatchOnly) {
                 Alert.alert(
                   'Watch-only vault',
@@ -527,6 +641,7 @@ export default function AccountDetail({ route, navigation }: Props) {
                 `${SATODIME_VAULT_STATE_LABELS[satodimeInfo.vaultState]}${isWatchOnly ? ' (watch-only)' : ''}`,
                 false,
               )}
+              {isNotOwner ? renderInfoField('Ownership', 'Not owner (watch-only)', false) : null}
               {satodimeInfo.cardLabel ? renderInfoField('Card label', satodimeInfo.cardLabel, false) : null}
               {renderInfoField('Card authentikey', satodimeInfo.authentikey, true)}
             </View>
@@ -543,6 +658,16 @@ export default function AccountDetail({ route, navigation }: Props) {
                 Re-scan card
               </Text>
             </TouchableOpacity>
+            {canReleaseOwnership && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.airgapButton, { backgroundColor: Theme['bg-250'] }]}
+                onPress={releaseOwnership}
+                activeOpacity={0.7}>
+                <Text style={[styles.actionButtonText, { color: Theme['fg-100'] }]}>
+                  Release ownership
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 

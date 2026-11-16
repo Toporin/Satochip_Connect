@@ -173,13 +173,18 @@ const SettingsStore = {
         this.saveSatochipWallets();
       } else if (wallet.type === WalletType.SATODIME){
         this.saveSatodimeWallets();
-        // forget the card unlock secret once no account uses this card anymore
-        const authentikey = (wallet as ISatodimeWallet).satodimeInfo.authentikey;
+        // CVC card: its unlock code is engraved on the card and can be entered
+        // again, so it is removed with the last account of the card.
+        // Non-CVC card: its code exists nowhere else and is never removed here;
+        // the account screen refuses to delete the card's last account until
+        // ownership is released (which deletes the code).
+        const info = (wallet as ISatodimeWallet).satodimeInfo;
+        const authentikey = info.authentikey.toLowerCase();
         const stillUsed = this.getSatodimeWallets()
-          .some(w => w.satodimeInfo.authentikey.toLowerCase() === authentikey.toLowerCase());
-        if (!stillUsed) {
-          SecretStore.deleteSatodimeUnlockSecret(authentikey).catch(error =>
-            console.error('Failed to delete Satodime unlock secret:', (error as Error).message));
+          .some(w => w.satodimeInfo.authentikey.toLowerCase() === authentikey);
+        if (info.fixedUnlockSecret === true && !stillUsed) {
+          SecretStore.deleteSatodimeUnlockSecret(info.authentikey).catch(error =>
+            console.error('Failed to delete Satodime unlock code:', (error as Error).message));
         }
       }
     }
@@ -288,16 +293,27 @@ const SettingsStore = {
     }
   },
 
-  /** Update the stored state of a Satodime vault after a card scan. */
-  updateSatodimeVaultState(walletId: string, vaultState: SatodimeVaultState) {
+  /**
+   * Update stored Satodime data after a card scan: the vault state of this
+   * account, and the CVC flag of every account of the same card.
+   */
+  updateSatodimeCardState(walletId: string, update: { vaultState: SatodimeVaultState; fixedUnlockSecret: boolean }) {
     const wallet = state.wallets.get(walletId);
     if (!wallet || wallet.type !== WalletType.SATODIME) {
       return;
     }
-    const info = (wallet as ISatodimeWallet).satodimeInfo;
-    if (info.vaultState !== vaultState) {
-      this.createSatodimeWallet({ ...info, vaultState });
+    const authentikey = (wallet as ISatodimeWallet).satodimeInfo.authentikey.toLowerCase();
+    for (const other of this.getSatodimeWallets()) {
+      const info = other.satodimeInfo;
+      if (info.authentikey.toLowerCase() !== authentikey) {
+        continue;
+      }
+      const vaultState = other.id === walletId ? update.vaultState : info.vaultState;
+      if (info.vaultState !== vaultState || info.fixedUnlockSecret !== update.fixedUnlockSecret) {
+        this.addWallet(new SatodimeWallet({ ...info, vaultState, fixedUnlockSecret: update.fixedUnlockSecret }));
+      }
     }
+    this.saveSatodimeWallets();
   },
 
   /**

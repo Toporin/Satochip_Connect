@@ -18,6 +18,7 @@ import { decodeSatodimeSlip44, SatodimeNetwork } from '@/constants/Satodime';
 const SW_INCORRECT_UNLOCK_CODE = 0x9C51;
 const SW_INCORRECT_UNLOCK_COUNTER = 0x9C50;
 const SW_INCORRECT_KEYSLOT_STATE = 0x9C52;
+const SW_SETUP_NOT_DONE = 0x9C04;
 
 export type SatodimeOwnership =
   /** this device holds a valid unlock secret */
@@ -80,16 +81,22 @@ async function readAuthentikey(card: SatodimeCard): Promise<string> {
   return toHex(authentikey.getPublicKeyBytes(true));
 }
 
-/** Prove ownership with a stored secret (protocol >= 0.2). */
+/**
+ * Prove ownership with the stored unlock code (protocol >= 0.2, card set up).
+ *
+ * checkUnlockCode() returns false for both a wrong code (9C51) and a counter
+ * out of sync (9C50). The counter is re-read before each attempt, so a 9C50
+ * does not repeat: a second failure means the code is wrong (the card changed
+ * owner), and the stored code is deleted since it is useless.
+ */
 async function checkStoredOwnership(card: SatodimeCard, authentikey: string): Promise<boolean> {
   const secret = await SecretStore.getSatodimeUnlockSecret(authentikey);
   if (!secret) {
     return false;
   }
   card.setUnlockSecret(secret);
-  const ok = await card.checkUnlockCode();
+  const ok = (await card.checkUnlockCode()) || (await card.checkUnlockCode());
   if (!ok) {
-    // the card changed owner since: the stored secret is useless
     await SecretStore.deleteSatodimeUnlockSecret(authentikey);
     card.setUnlockSecret(null);
   }
@@ -256,9 +263,17 @@ export async function signDigestWithSatodime(
     return await card.signTransactionHash(info.vaultIndex, digest);
   } catch (error) {
     const sw = statusWordOf(error);
-    if (sw === SW_INCORRECT_UNLOCK_CODE || sw === SW_INCORRECT_UNLOCK_COUNTER) {
+    if (sw === SW_INCORRECT_UNLOCK_CODE) {
+      // wrong unlock code: the card changed owner, the stored code is useless
       await SecretStore.deleteSatodimeUnlockSecret(info.authentikey);
-      throw new Error('This device is no longer the owner of this Satodime card (ownership was transferred).');
+      throw new Error('This device is not (or no longer) the owner of this Satodime card.');
+    }
+    if (sw === SW_INCORRECT_UNLOCK_COUNTER) {
+      // transient: keep the stored code
+      throw new Error('Unlock counter out of sync, please try again.');
+    }
+    if (sw === SW_SETUP_NOT_DONE) {
+      throw new Error('This card has no owner (ownership was released). Add the account again to claim it.');
     }
     if (sw === SW_INCORRECT_KEYSLOT_STATE) {
       throw new Error(`Vault #${info.vaultIndex + 1} cannot sign in its current state.`);
@@ -269,22 +284,68 @@ export async function signDigestWithSatodime(
   }
 }
 
+export interface SatodimeCardState {
+  vaultState: SatodimeVaultState;
+  /** false when ownership was released (card has no owner) */
+  setupDone: boolean;
+  /** CVC card: the unlock code is engraved on the card and never changes */
+  fixedUnlockSecret: boolean;
+  /** this phone holds a valid unlock code for the card */
+  ownedByThisPhone: boolean;
+}
+
 /**
- * Re-read the state of an account's vault (e.g. after it was unsealed in the
- * Satodime app), checking that the card and the vault key still match.
+ * Re-read the state of an account's card and vault (e.g. after the vault was
+ * unsealed in the Satodime app), checking that the card and the vault key
+ * still match. Ownership is checked with the stored unlock code (0x54).
  */
-export async function readSatodimeVaultState(card: SatodimeCard, info: SatodimeInfo): Promise<SatodimeVaultState> {
+export async function readSatodimeCardState(card: SatodimeCard, info: SatodimeInfo): Promise<SatodimeCardState> {
+  const status = await card.getStatus();
   const authentikey = await readAuthentikey(card);
   if (authentikey.toLowerCase() !== info.authentikey.toLowerCase()) {
     throw new Error('Wrong card: the card authentikey does not match this account.');
   }
   const keyslot = await card.getKeyslotStatus(info.vaultIndex);
-  const state = keyslot.state as number as SatodimeVaultState;
-  if (state !== SatodimeVaultState.UNINITIALIZED) {
+  const vaultState = keyslot.state as number as SatodimeVaultState;
+  if (vaultState !== SatodimeVaultState.UNINITIALIZED) {
     const pubkey = toHex(await card.getPubkey(info.vaultIndex));
     if (pubkey.toLowerCase() !== info.pubkey.toLowerCase()) {
       throw new Error(`Vault #${info.vaultIndex + 1} holds a different key than this account.`);
     }
   }
-  return state;
+  const satodimeStatus = await card.getSatodimeStatus();
+  const fixedUnlockSecret = satodimeStatus.fixedUnlockSecret === true;
+  const ownedByThisPhone =
+    status.setupDone && card.supportsHashSigning(status) && (await checkStoredOwnership(card, info.authentikey));
+  card.setUnlockSecret(null);
+  return { vaultState, setupDone: status.setupDone, fixedUnlockSecret, ownedByThisPhone };
+}
+
+/**
+ * Release ownership of a non-CVC card owned by this phone (0x5A). Anyone can
+ * then claim the card, which creates a new unlock code: the stored code is
+ * deleted. Not offered for CVC cards (their code is engraved and never changes).
+ */
+export async function releaseSatodimeOwnership(card: SatodimeCard, info: SatodimeInfo): Promise<void> {
+  const status = await card.getStatus();
+  if (!card.supportsHashSigning(status)) {
+    throw new Error(`This Satodime (${formatCardVersion(status.version)}) is not supported.`);
+  }
+  await requireSameCard(card, info.authentikey);
+  if (!status.setupDone) {
+    throw new Error('This card has no owner: there is nothing to release.');
+  }
+  const satodimeStatus = await card.getSatodimeStatus();
+  if (satodimeStatus.fixedUnlockSecret === true) {
+    throw new Error('This card has an engraved code: releasing ownership is not needed.');
+  }
+  if (!(await checkStoredOwnership(card, info.authentikey))) {
+    throw new Error('This device is not the owner of this Satodime card.');
+  }
+  try {
+    await card.transferOwnership();
+  } finally {
+    card.setUnlockSecret(null);
+  }
+  await SecretStore.deleteSatodimeUnlockSecret(info.authentikey);
 }

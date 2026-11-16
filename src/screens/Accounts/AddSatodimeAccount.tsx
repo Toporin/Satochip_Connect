@@ -90,7 +90,9 @@ export default function AddSatodimeAccountScreen({ navigation }: Props) {
     if (scan.ownership === 'unclaimed') {
       Alert.alert(
         'Claim this Satodime?',
-        'This card has no owner. Claiming it makes this phone its owner: only this phone will be able to sign with its vaults. You will need to tap the card again.',
+        scan.fixedUnlockSecret
+          ? 'This card has no owner. Claiming it makes this phone an owner. This card has an engraved code: anyone holding the card and its code can also take ownership. You will need to tap the card again.'
+          : 'This card has no owner. Claiming it makes this phone its owner: only this phone will be able to sign with its vaults. You will need to tap the card again.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Claim', onPress: () => claimOwnership(scan) },

@@ -59,6 +59,7 @@ export default function SatodimeVaultSelectScreen({ route, navigation }: Props) 
       slip44: selectedVault.slip44,
       vaultState: selectedVault.state,
       cardLabel: scan.label || undefined,
+      fixedUnlockSecret: scan.fixedUnlockSecret,
     };
     const wallet = SettingsStore.createSatodimeWallet(info);
     if (!wallet) {

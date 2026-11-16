@@ -38,6 +38,8 @@ import { decodeSatodimeSlip44 } from '@/constants/Satodime';
 import { SatodimeInfo, SatodimeVaultState, WalletType } from '@/types/WalletTypes';
 import { SecretStore } from '@/utils/SecretStore';
 import {
+  readSatodimeCardState,
+  releaseSatodimeOwnership,
   satodimeAddressFromPubkey,
   signDigestWithSatodime,
 } from '@/wallets/satodime/SatodimeClient';
@@ -184,11 +186,28 @@ describe('card and vault checks before signing', () => {
     state: number;
     pubkey: string;
     signError: { statusWord: number };
+    setupDone: boolean;
+    fixedUnlockSecret: boolean;
+    /** successive results of checkUnlockCode() */
+    checkResults: boolean[];
   }> = {}) {
-    const o = { protocolMinor: 2, authentikey: AUTHENTIKEY, state: 2, pubkey: VAULT.pubkey, ...overrides };
+    const o = {
+      protocolMinor: 2,
+      authentikey: AUTHENTIKEY,
+      state: 2,
+      pubkey: VAULT.pubkey,
+      setupDone: true,
+      fixedUnlockSecret: false,
+      checkResults: [true],
+      ...overrides,
+    };
+    const checks = [...o.checkResults];
     const secrets: Array<Buffer | null> = [];
     const card = {
-      getStatus: async () => ({ version: { protocolMajor: 0, protocolMinor: o.protocolMinor, appletMajor: 0, appletMinor: 1, protocolVersion: o.protocolMinor, appletVersion: 1 }, setupDone: true, needsSecureChannel: true }),
+      getStatus: async () => ({ version: { protocolMajor: 0, protocolMinor: o.protocolMinor, appletMajor: 0, appletMinor: 1, protocolVersion: o.protocolMinor, appletVersion: 1 }, setupDone: o.setupDone, needsSecureChannel: true }),
+      getSatodimeStatus: async () => ({ unlockCounter: Buffer.alloc(4), nbKeyslots: 3, keyslotStates: [2, 0, 0], fixedUnlockSecret: o.fixedUnlockSecret }),
+      checkUnlockCode: jest.fn(async () => (checks.length > 0 ? checks.shift()! : false)),
+      transferOwnership: jest.fn(async () => undefined),
       supportsHashSigning: (s: { version: { protocolVersion: number } }) => s.version.protocolVersion >= 2,
       getAuthentikey: async () => ({ getPublicKeyBytes: () => Buffer.from(o.authentikey, 'hex') }),
       getKeyslotStatus: async () => ({ state: o.state }),
@@ -249,9 +268,21 @@ describe('card and vault checks before signing', () => {
     await expect(signDigestWithSatodime(card, info, digest)).rejects.toThrow(/not the owner/);
   });
 
+  test('counter out of sync (9C50): the secret is kept', async () => {
+    const { card } = mockCard({ signError: { statusWord: 0x9c50 } });
+    await expect(signDigestWithSatodime(card, info, digest)).rejects.toThrow(/counter out of sync/);
+    expect(await SecretStore.hasSatodimeUnlockSecret(AUTHENTIKEY)).toBe(true);
+  });
+
+  test('released card (9C04): clear message, secret kept', async () => {
+    const { card } = mockCard({ signError: { statusWord: 0x9c04 } });
+    await expect(signDigestWithSatodime(card, info, digest)).rejects.toThrow(/no owner/);
+    expect(await SecretStore.hasSatodimeUnlockSecret(AUTHENTIKEY)).toBe(true);
+  });
+
   test('ownership lost (9C51): the stale secret is deleted', async () => {
     const { card } = mockCard({ signError: { statusWord: 0x9c51 } });
-    await expect(signDigestWithSatodime(card, info, digest)).rejects.toThrow(/no longer the owner/);
+    await expect(signDigestWithSatodime(card, info, digest)).rejects.toThrow(/not \(or no longer\) the owner/);
     expect(await SecretStore.hasSatodimeUnlockSecret(AUTHENTIKEY)).toBe(false);
   });
 
@@ -262,5 +293,52 @@ describe('card and vault checks before signing', () => {
     expect(ethers.utils.verifyMessage('hello', sig)).toBe(VAULT.address);
     expect(wallet.isWatchOnly()).toBe(false);
     expect(new SatodimeWallet({ ...info, vaultState: SatodimeVaultState.SEALED }).isWatchOnly()).toBe(true);
+  });
+
+  describe('card state and ownership', () => {
+    test('owned: one transient failure (9C50) is retried, the code is kept', async () => {
+      const { card } = mockCard({ checkResults: [false, true] });
+      const state = await readSatodimeCardState(card, info);
+      expect(state).toMatchObject({ vaultState: 2, setupDone: true, fixedUnlockSecret: false, ownedByThisPhone: true });
+      expect(card.checkUnlockCode).toHaveBeenCalledTimes(2);
+      expect(await SecretStore.hasSatodimeUnlockSecret(AUTHENTIKEY)).toBe(true);
+    });
+
+    test('wrong code twice (9C51): not owner, the stale code is deleted', async () => {
+      const { card } = mockCard({ checkResults: [false, false] });
+      const state = await readSatodimeCardState(card, info);
+      expect(state.ownedByThisPhone).toBe(false);
+      expect(await SecretStore.hasSatodimeUnlockSecret(AUTHENTIKEY)).toBe(false);
+    });
+
+    test('released card (setup not done) and CVC flag', async () => {
+      const { card } = mockCard({ setupDone: false, fixedUnlockSecret: true });
+      const state = await readSatodimeCardState(card, info);
+      expect(state).toMatchObject({ setupDone: false, fixedUnlockSecret: true, ownedByThisPhone: false });
+      expect(card.checkUnlockCode).not.toHaveBeenCalled();
+      expect(await SecretStore.hasSatodimeUnlockSecret(AUTHENTIKEY)).toBe(true);
+    });
+
+    test('release ownership of a non-CVC card owned here: 0x5A sent, code deleted', async () => {
+      const { card } = mockCard();
+      await releaseSatodimeOwnership(card, info);
+      expect(card.transferOwnership).toHaveBeenCalledTimes(1);
+      expect(await SecretStore.hasSatodimeUnlockSecret(AUTHENTIKEY)).toBe(false);
+    });
+
+    test('release is refused for CVC cards, wrong cards and when not owner', async () => {
+      const cvc = mockCard({ fixedUnlockSecret: true });
+      await expect(releaseSatodimeOwnership(cvc.card, info)).rejects.toThrow(/engraved code/);
+      const wrong = mockCard({ authentikey: '03' + '44'.repeat(32) });
+      await expect(releaseSatodimeOwnership(wrong.card, info)).rejects.toThrow(/Wrong card/);
+      const released = mockCard({ setupDone: false });
+      await expect(releaseSatodimeOwnership(released.card, info)).rejects.toThrow(/no owner/);
+      mockKeychain.clear();
+      const notOwner = mockCard();
+      await expect(releaseSatodimeOwnership(notOwner.card, info)).rejects.toThrow(/not the owner/);
+      for (const m of [cvc, wrong, released, notOwner]) {
+        expect(m.card.transferOwnership).not.toHaveBeenCalled();
+      }
+    });
   });
 });

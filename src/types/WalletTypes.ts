@@ -52,6 +52,13 @@ export interface SatodimeInfo extends WalletInfo {
   vaultState: SatodimeVaultState;
   /** Card label at import time, if any. */
   cardLabel?: string;
+  /**
+   * CVC card: the unlock code is engraved on the card and never changes (anyone
+   * with the card can take ownership). Non-CVC card: a new random code is
+   * created at each claim and only the claiming device knows it.
+   * Undefined for accounts added before this was recorded.
+   */
+  fixedUnlockSecret?: boolean;
 }
 
 export interface SoftwareWalletInfo extends WalletInfo {
