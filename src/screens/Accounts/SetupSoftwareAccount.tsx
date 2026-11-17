@@ -24,6 +24,7 @@ import { WalletEncryptionService } from '../../wallets/WalletEncryptionService.t
 import SuccessIllustration from '@/assets/images/illustration.svg';
 import AlertIllustration from '@/assets/images/alert_illustration.svg';
 import { CommonActions } from '@react-navigation/native';
+import { PasswordInput } from '@/components/PasswordInput';
 
 type Props = AccountsStackScreenProps<'SetupSoftwareAccount'>;
 
@@ -194,24 +195,16 @@ export default function SetupSoftwareAccountScreen({ navigation }: Props) {
         {/* Account password TODO: add hint for user */}
         <View style={setupStyles.formGroup}>
           <Text style={[setupStyles.formLabel, { color: Theme['fg-100'] }]}>
-            Account password
+            Account password (min 8 chars)
           </Text>
-          <TextInput
-            style={[
-              setupStyles.textInput,
-              {
-                backgroundColor: Theme['bg-175'],
-                color: Theme['fg-100'],
-                borderColor: Theme['bg-250']
-              }
-            ]}
-            placeholder="Used to encrypt the mnemonic (min 8 chars)"
+          <PasswordInput
+            containerStyle={{ backgroundColor: Theme['bg-175'], borderColor: Theme['bg-250'] }}
+            inputStyle={{ color: Theme['fg-100'] }}
+            iconColor={Theme['fg-150']}
+            placeholder="Used to encrypt the mnemonic"
             placeholderTextColor={Theme['fg-300']}
             value={userPassword}
             onChangeText={setUserPassword}
-            secureTextEntry={true}
-            autoCapitalize="none"
-            autoCorrect={false}
             autoComplete="off"
             spellCheck={false}
             maxLength={64}
