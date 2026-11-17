@@ -5,6 +5,8 @@ import { AccountsStackParamList } from '@/utils/TypesUtil';
 import AccountsScreen from '@/screens/Accounts';
 import AddSatochipAccountScreen from '@/screens/Accounts/AddSatochipAccount';
 import SatochipSetupScreen from '@/screens/Accounts/SatochipSetup';
+import AddSatodimeAccountScreen from '@/screens/Accounts/AddSatodimeAccount';
+import SatodimeVaultSelectScreen from '@/screens/Accounts/SatodimeVaultSelect';
 import SetupSoftwareAccountScreen from '@/screens/Accounts/SetupSoftwareAccount.tsx';
 import AccountDetailsScreen from '@/screens/Accounts/AccountDetail';
 import SendTransactionScreen from '@/screens/Accounts/SendTransaction';
@@ -51,6 +53,22 @@ export default function AccountsStack() {
         component={SatochipSetupScreen}
         options={{
           title: 'Setup Satochip',
+        }}
+      />
+
+      {/* Satodime flow screens */}
+      <Stack.Screen
+        name="AddSatodimeAccount"
+        component={AddSatodimeAccountScreen}
+        options={{
+          title: 'Add Satodime Account',
+        }}
+      />
+      <Stack.Screen
+        name="SatodimeVaultSelect"
+        component={SatodimeVaultSelectScreen}
+        options={{
+          title: 'Satodime Vaults',
         }}
       />
 

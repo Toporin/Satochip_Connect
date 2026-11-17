@@ -6,10 +6,18 @@ interface Props {
   addresses: string[];
   selectedAddresses: Set<string>;
   onToggleAddress: (address: string) => void;
+  /** Show the selection hint in the error colour (e.g. after Approve was pressed). */
+  highlightHint?: boolean;
 }
 
-export function SelectableAddresses({addresses, selectedAddresses, onToggleAddress}: Props) {
+export function SelectableAddresses({addresses, selectedAddresses, onToggleAddress, highlightHint}: Props) {
   const Theme = useTheme();
+  const hint =
+    addresses.length === 0
+      ? 'No account yet: add one in the Accounts tab first.'
+      : selectedAddresses.size === 0
+      ? 'Tap the address(es) to share with this app.'
+      : undefined;
 
   return (
     <ScrollView
@@ -19,6 +27,11 @@ export function SelectableAddresses({addresses, selectedAddresses, onToggleAddre
       <Text style={[styles.title, {color: Theme['fg-150']}]}>
         Select Addresses ({selectedAddresses.size}/{addresses.length})
       </Text>
+      {hint ? (
+        <Text style={[styles.hint, {color: highlightHint ? Theme['error-100'] : Theme['fg-175']}]}>
+          {hint}
+        </Text>
+      ) : null}
       <View style={styles.row}>
         {addresses.map(address => {
           const isSelected = selectedAddresses.has(address);
@@ -61,6 +74,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: '600',
     margin: 4,
+  },
+  hint: {
+    fontSize: 12,
+    lineHeight: 16,
+    marginHorizontal: 4,
+    marginBottom: 6,
   },
   row: {
     flexDirection: 'row',

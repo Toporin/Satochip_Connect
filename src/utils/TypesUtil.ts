@@ -1,3 +1,4 @@
+import type { ScannedSatodime } from '@/wallets/satodime/SatodimeClient';
 import {NavigatorScreenParams} from '@react-navigation/native';
 import {StackScreenProps} from '@react-navigation/stack';
 import {CompositeScreenProps} from '@react-navigation/native';
@@ -69,6 +70,8 @@ export type RootStackParamList = {
   AirgapSync: {accountId: string};
   AirgapReview: {cborHex: string; urType: string};
   AirgapSignature: {cborHex: string; summary?: string};
+  AirgapSingleKeySync: {accountId: string};
+  AirgapHelperError: {accountId: string; helperIndex: number; helperAddress: string; primaryAddress: string};
 };
 
 export type HomeTabParamList = {
@@ -89,6 +92,8 @@ export type AccountsStackParamList = {
   AccountDetails: { accountId: string };
   SendTransaction: { accountId: string; chainId?: number, chainIds?: number[] };
   NftDetail: { nftKey: string };
+  AddSatodimeAccount: undefined;
+  SatodimeVaultSelect: { scan: ScannedSatodime };
 };
 
 export type SettingsStackParamList = {

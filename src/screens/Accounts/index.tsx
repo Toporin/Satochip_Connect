@@ -17,6 +17,7 @@ import { AccountsStackScreenProps } from '@/utils/TypesUtil';
 import styles from './styles';
 import { Icon } from '@reown/appkit-ui-react-native';
 import { formatUSD } from '@/utils/formatters';
+import { WalletType } from '@/types/WalletTypes';
 
 type Props = AccountsStackScreenProps<'Accounts'>;
 
@@ -24,7 +25,9 @@ interface AccountItem {
   id: string;
   name: string;
   address: string;
-  type: 'software' | 'hardware';
+  type: WalletType;
+  /** Text of the account type chip */
+  chipLabel: string;
   blockchain: string;
   masterXfp?: string; // For Satochip accounts
   derivationPath?: string;
@@ -48,10 +51,24 @@ export default function AccountsScreen({ navigation }: Props) {
         id: wallet.id,
         name: `${info.name || 'Satochip'}`,
         address: wallet.address || 'Not derived',
-        type: 'hardware',
+        type: wallet.type,
+        chipLabel: 'Satochip',
         blockchain: wallet.blockchain,
         masterXfp: info.masterXfp,
         derivationPath: info.derivationPath,
+      });
+    }
+
+    // Add Satodime vault accounts
+    for (const wallet of SettingsStore.getSatodimeWallets()) {
+      const info = wallet.getWalletInfo();
+      accountsList.push({
+        id: wallet.id,
+        name: `${info.name || 'Satodime'}`,
+        address: wallet.address,
+        type: wallet.type,
+        chipLabel: 'Satodime',
+        blockchain: wallet.blockchain,
       });
     }
 
@@ -63,7 +80,8 @@ export default function AccountsScreen({ navigation }: Props) {
         id: wallet.id,
         name: `${info.name || 'Software'}`,
         address: wallet.address,
-        type: 'software',
+        type: wallet.type,
+        chipLabel: 'Software',
         blockchain: wallet.blockchain,
       });
     }
@@ -112,6 +130,10 @@ export default function AccountsScreen({ navigation }: Props) {
     navigation.navigate('AddSatochipAccount');
   };
 
+  const handleAddSatodimeAccount = () => {
+    navigation.navigate('AddSatodimeAccount');
+  };
+
   const handleAddSoftwareAccount = () => {
     navigation.navigate('SetupSoftwareAccount');
   };
@@ -121,7 +143,7 @@ export default function AccountsScreen({ navigation }: Props) {
   };
 
   const renderAccountCard = (account: AccountItem) => {
-    const isHardware = account.type === 'hardware';
+    const isHardware = account.type !== WalletType.SOFTWARE;
 
     return (
       <View
@@ -139,7 +161,7 @@ export default function AccountsScreen({ navigation }: Props) {
               styles.accountTypeText,
               { color: isHardware ? Theme['inverse-100'] : Theme['fg-150'] }
             ]}>
-              {isHardware ? 'Hardware' : 'Software'}
+              {account.chipLabel}
             </Text>
           </View>
         </View>
@@ -217,22 +239,30 @@ export default function AccountsScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: Theme['fg-100'] }]}>
-            Accounts ({accounts.length})
-          </Text>
+        <Text style={[styles.sectionTitle, styles.sectionTitleRow, { color: Theme['fg-100'] }]}>
+          Accounts ({accounts.length})
+        </Text>
+        <View style={styles.addButtonsRow}>
           <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: Theme['accent-100'] }]}
+            style={[styles.addButton, styles.addButtonFlex, { backgroundColor: Theme['accent-100'] }]}
             onPress={handleAddAccount}>
-            <Text style={[styles.addButtonText, { color: Theme['inverse-100'] }]}>
+            <Text style={[styles.addButtonText, { color: Theme['inverse-100'] }]} numberOfLines={1}>
               Add Satochip
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: Theme['accent-100'] }]}
+            style={[styles.addButton, styles.addButtonFlex, { backgroundColor: Theme['accent-100'] }]}
+            onPress={handleAddSatodimeAccount}>
+            <Text style={[styles.addButtonText, { color: Theme['inverse-100'] }]} numberOfLines={1}>
+              Add Satodime
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.addButton, styles.addButtonFlex, { backgroundColor: Theme['accent-100'] }]}
             onPress={handleAddSoftwareAccount}>
-            <Text style={[styles.addButtonText, { color: Theme['inverse-100'] }]}>
+            <Text style={[styles.addButtonText, { color: Theme['inverse-100'] }]} numberOfLines={1}>
               Add Soft Wallet
             </Text>
           </TouchableOpacity>
@@ -244,7 +274,7 @@ export default function AccountsScreen({ navigation }: Props) {
               No accounts found
             </Text>
             <Text style={[styles.emptyDescription, { color: Theme['fg-150'] }]}>
-              Add your first Satochip hardware wallet account to get started
+              Add a Satochip or Satodime card, or a software wallet, to get started
             </Text>
           </View>
         ) : (

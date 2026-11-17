@@ -1,8 +1,9 @@
-import { SatochipCard } from 'satochip-react-native';
+import type { BaseCard } from 'satochip-react-native';
 import { Platform } from 'react-native';
 import { useState } from 'react';
 
-const useSatochipModal = (card: SatochipCard) => {
+// Works with any card of the Satochip family (Satochip, Satodime...)
+const useSatochipModal = (card: BaseCard) => {
   const [nfcVisible, setNfcVisible] = useState<boolean>(false);
 
   const withModal = (callback) =>

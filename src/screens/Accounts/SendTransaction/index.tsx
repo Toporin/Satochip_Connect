@@ -11,7 +11,7 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { ethers } from 'ethers';
-import { SatochipCard } from 'satochip-react-native';
+import { SatochipCard, SatodimeCard } from 'satochip-react-native';
 
 import { useTheme } from '@/hooks/useTheme';
 import useSatochipModal from '@/hooks/useSatochipModal';
@@ -44,7 +44,10 @@ const SendTransactionScreen: React.FC = () => {
 
   // Get wallet
   const wallet = SettingsStore.getWallet(accountId);
-  const [card] = useState(new SatochipCard());
+  // Satodime vault accounts use a SatodimeCard (no PIN)
+  const [card] = useState<SatochipCard | SatodimeCard>(() =>
+    wallet?.type === WalletType.SATODIME ? new SatodimeCard() : new SatochipCard(),
+  );
   const { nfcVisible, withModal, closeNfc } = useSatochipModal(card);
 
   // Form state
@@ -288,7 +291,12 @@ const SendTransactionScreen: React.FC = () => {
   // Handle confirmation
   const handleConfirm = () => {
     setShowConfirmModal(false);
-    setShowPinModal(true);
+    if (wallet?.type === WalletType.SATODIME) {
+      // no PIN for Satodime: scan the card directly
+      handlePinSubmit('');
+    } else {
+      setShowPinModal(true);
+    }
   };
 
   // Handle PIN submission
@@ -332,7 +340,8 @@ const SendTransactionScreen: React.FC = () => {
         pin,
         card,
         withModal,
-        closeNfc
+        closeNfc,
+        wallet, // sign with this account, not the first one sharing its address
       );
 
       // Extract transaction hash
@@ -668,7 +677,7 @@ const SendTransactionScreen: React.FC = () => {
         type={wallet.type === WalletType.SATOCHIP ? 'PIN' : 'password'}
       />
 
-      {Platform.OS === 'android' && wallet.type === WalletType.SATOCHIP && (
+      {Platform.OS === 'android' && (wallet.type === WalletType.SATOCHIP || wallet.type === WalletType.SATODIME) && (
         <NfcPromptAndroid visible={nfcVisible} close={closeNfc} />
       )}
     </View>

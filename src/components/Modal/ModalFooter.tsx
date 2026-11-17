@@ -13,6 +13,12 @@ export interface ModalFooterProps {
   rejectLoader?: boolean;
   verifyContext?: Verify.Context;
   disableApprove?: boolean;
+  /**
+   * Called when Approve is pressed while disableApprove is set. When given,
+   * the button still looks disabled but stays pressable, so the screen can
+   * explain what is missing instead of ignoring the tap.
+   */
+  onDisabledApprovePress?: () => void;
 }
 
 export function ModalFooter({
@@ -22,6 +28,7 @@ export function ModalFooter({
   rejectLoader,
   verifyContext,
   disableApprove,
+  onDisabledApprovePress,
 }: ModalFooterProps) {
   const Theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -53,10 +60,10 @@ export function ModalFooter({
         </ActionButton>
         <ActionButton
           loading={approveLoader}
-          disabled={approveLoader || rejectLoader || disableApprove}
+          disabled={approveLoader || rejectLoader || (disableApprove && !onDisabledApprovePress)}
           style={[styles.button, {backgroundColor: bgColor}]}
           textStyle={styles.approveText}
-          onPress={onApprove}>
+          onPress={disableApprove ? onDisabledApprovePress ?? onApprove : onApprove}>
           Approve
         </ActionButton>
       </View>

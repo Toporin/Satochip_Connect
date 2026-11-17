@@ -30,6 +30,9 @@ export default function useInitializeWalletKit() {
       // Load Satochip wallets from persistent memory
       await SettingsStore.loadSatochipWallets();
 
+      // Load Satodime vault accounts from persistent memory
+      await SettingsStore.loadSatodimeWallets();
+
       // Initialize WalletConnect
       await createWalletKit(relayerRegionURL);
 

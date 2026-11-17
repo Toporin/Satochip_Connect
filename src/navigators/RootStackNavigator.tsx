@@ -5,6 +5,7 @@ import {HomeTabNavigator} from './HomeTabNavigator';
 import SessionDetail from '@/screens/SessionDetail';
 import Scan from '@/screens/Scan';
 import Modal from '@/components/Modal';
+import {SatodimeUnlockPrompts} from '@/components/SatodimeUnlockPrompts';
 import {useTheme} from '@/hooks/useTheme';
 import {LogList} from '@/screens/LogList';
 import {AppLogs} from '@/screens/AppLogs';
@@ -13,6 +14,8 @@ import {useAppLogger} from '@/hooks/useAppLogger';
 import AirgapSync from '@/screens/Airgap/SyncScreen';
 import AirgapReview from '@/screens/Airgap/ReviewScreen';
 import AirgapSignature from '@/screens/Airgap/SignatureScreen';
+import AirgapSingleKeySync from '@/screens/Airgap/SingleKeySyncScreen';
+import AirgapHelperError from '@/screens/Airgap/HelperErrorScreen';
 
 const StackNavigator = createStackNavigator<RootStackParamList>();
 
@@ -24,6 +27,7 @@ export function RootStackNavigator() {
   return (
     <>
       <Modal />
+      <SatodimeUnlockPrompts />
       <StackNavigator.Navigator
         screenOptions={{
           headerShown: false,
@@ -104,6 +108,26 @@ export function RootStackNavigator() {
             headerBackTitle: '',
             headerLeft: () => null,
             gestureEnabled: false,
+            headerTintColor: Theme['fg-100'],
+          }}
+        />
+        <StackNavigator.Screen
+          name="AirgapSingleKeySync"
+          component={AirgapSingleKeySync}
+          options={{
+            headerShown: true,
+            title: 'Connect browser extension',
+            headerBackTitle: '',
+            headerTintColor: Theme['fg-100'],
+          }}
+        />
+        <StackNavigator.Screen
+          name="AirgapHelperError"
+          component={AirgapHelperError}
+          options={{
+            headerShown: true,
+            title: 'Request rejected',
+            headerBackTitle: '',
             headerTintColor: Theme['fg-100'],
           }}
         />

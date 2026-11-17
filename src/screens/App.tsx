@@ -1,6 +1,6 @@
 import {useCallback, useEffect} from 'react';
 import Config from 'react-native-config';
-import {Linking, Platform, StatusBar, useColorScheme} from 'react-native';
+import {Linking, StatusBar, useColorScheme} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {
   SafeAreaProvider,
@@ -9,6 +9,7 @@ import {
 import * as Sentry from '@sentry/react-native';
 import BootSplash from 'react-native-bootsplash';
 import Toast from 'react-native-toast-message';
+import {AppToast} from '@/components/AppToast';
 import {RELAYER_EVENTS} from '@walletconnect/core';
 import { LogBox } from 'react-native';
 
@@ -159,10 +160,7 @@ const App = () => {
           barStyle={scheme === 'light' ? 'dark-content' : 'light-content'}
         />
         <RootStackNavigator />
-        <Toast
-          position="top"
-          topOffset={Platform.select({ios: 80, android: 0})}
-        />
+        <AppToast />
       </NavigationContainer>
     </ThemeProvider>
     </SafeAreaProvider>

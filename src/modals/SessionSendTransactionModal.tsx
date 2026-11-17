@@ -1,5 +1,5 @@
 import {useSnapshot} from 'valtio';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {Alert, View, StyleSheet} from 'react-native';
 import {SignClientTypes} from '@walletconnect/types';
 
@@ -11,9 +11,9 @@ import {
   rejectEIP155RequestEnhanced,
 } from '@/utils/EnhancedEIP155RequestHandler';
 
-import { SatochipCard } from 'satochip-react-native';
 import NfcPrompt from '@/components/NfcPromptAndroid.tsx';
-import useSatochipModal from '@/hooks/useSatochipModal.ts';
+import useRequestWallet from '@/hooks/useRequestWallet';
+import { AccountSelector } from '@/components/Modal/AccountSelector';
 
 // Import the PinModal component
 import { PinModal } from '@/components/Modal/PinModal';
@@ -25,7 +25,6 @@ import {RequestModal} from '@/modals/RequestModal';
 import {Chains} from '@/components/Modal/Chains';
 import {PresetsUtil} from '@/utils/PresetsUtil';
 import { getEIP155AddressesFromParams } from '@/utils/HelperUtil.ts';
-import SettingsStore from '@/store/SettingsStore.ts';
 import { WalletType } from '@/types/WalletTypes.ts';
 import { Addresses } from '@/components/Modal/Addresses.tsx';
 
@@ -37,9 +36,6 @@ export default function SessionSendTransactionModal() {
   // PIN modal state
   const [showPinModal, setShowPinModal] = useState(false);
 
-  // satochip
-  const card = useRef(new SatochipCard()).current;
-  const { withModal, nfcVisible, closeNfc } = useSatochipModal(card);
 
   // Get request and wallet data from store
   const requestEvent = data?.requestEvent;
@@ -54,7 +50,18 @@ export default function SessionSendTransactionModal() {
   const method = requestEvent?.params?.request?.method!;
   const isLinkMode = session?.transportType === 'link_mode';
   const address = getEIP155AddressesFromParams(params);
-  const wallet = SettingsStore.getWalletByAddress(address);
+  // Account that signs: several accounts can share this address (e.g. a software
+  // account restored from a Satochip seed), the user then picks one.
+  const {
+    candidates,
+    wallet,
+    needsChoice,
+    selectWallet,
+    card,
+    withModal,
+    nfcVisible,
+    closeNfc,
+  } = useRequestWallet(address);
   const walletType = wallet?.type;
 
   const peerMetadata = session?.peer?.metadata as SignClientTypes.Metadata;
@@ -66,7 +73,7 @@ export default function SessionSendTransactionModal() {
       setIsLoadingApprove(true);
       try {
 
-        const response = await approveEIP155RequestEnhanced(requestEvent, userPin, card, withModal, closeNfc);
+        const response = await approveEIP155RequestEnhanced(requestEvent, userPin, card, withModal, closeNfc, wallet);
 
         await walletKit.respondSessionRequest({
           topic,
@@ -94,7 +101,7 @@ export default function SessionSendTransactionModal() {
         ModalStore.close();
       }
     }
-  }, [requestEvent, peerMetadata, topic, isLinkMode, card, withModal, closeNfc]);
+  }, [requestEvent, peerMetadata, topic, isLinkMode, card, withModal, closeNfc, wallet]);
 
   // Handle PIN submission
   const handlePinSubmit = useCallback((userPin: string) => {
@@ -109,6 +116,10 @@ export default function SessionSendTransactionModal() {
 
   // Handle approve action - shows PIN modal first for Satochip
   const onApprove = useCallback(async () => {
+    if (needsChoice) {
+      Alert.alert('Choose an account', 'Several accounts use this address. Select the account to sign with.');
+      return;
+    }
     if (walletType === WalletType.SATOCHIP) {
       setShowPinModal(true);
     } else if (walletType === WalletType.SOFTWARE) {
@@ -118,11 +129,13 @@ export default function SessionSendTransactionModal() {
       } else {
         setShowPinModal(true);
       }
+    } else if (walletType === WalletType.SATODIME) {
+      // Satodime: no PIN, the card is scanned directly
+      await performApproval('');
     } else {
-      // TODO: support satodime
       await performApproval('');
     }
-  }, [performApproval, wallet, walletType]);
+  }, [performApproval, wallet, walletType, needsChoice]);
 
   // Handle reject action
   const onReject = useCallback(async () => {
@@ -158,6 +171,9 @@ export default function SessionSendTransactionModal() {
         <View style={styles.container}>
           {chain ? <Chains chains={[chain]} /> : null}
           {address ? <Addresses addresses={[address]} /> : null}
+          {candidates.length > 1 ? (
+            <AccountSelector wallets={candidates} selectedId={wallet?.id} onSelect={selectWallet} />
+          ) : null}
           <Methods methods={[method]} />
           <Message message={JSON.stringify(transaction, null, 2)} />
         </View>

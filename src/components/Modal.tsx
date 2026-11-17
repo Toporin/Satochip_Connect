@@ -2,6 +2,7 @@ import {useSnapshot} from 'valtio';
 import {useCallback, useMemo} from 'react';
 import {StyleSheet, View} from 'react-native';
 import RNModal from 'react-native-modal';
+import {AppToast} from '@/components/AppToast';
 
 import ModalStore from '@/store/ModalStore';
 import SessionProposalModal from '@/modals/SessionProposalModal';
@@ -51,6 +52,8 @@ export default function Modal() {
       style={styles.modal}
       isVisible={open}>
       {componentView}
+      {/* toasts shown while the modal is open (separate window on Android) */}
+      <AppToast />
     </RNModal>
   );
 }
