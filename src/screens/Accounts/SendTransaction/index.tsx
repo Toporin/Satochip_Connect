@@ -232,7 +232,10 @@ const SendTransactionScreen: React.FC = () => {
   };
 
   // Handle amount change
-  const handleAmountChange = (text: string) => {
+  const handleAmountChange = (rawText: string) => {
+    // The iOS (and some Android) decimal-pad shows the locale's decimal
+    // separator, which is ',' in many regions: normalize it to '.'.
+    const text = rawText.replace(/,/g, '.');
     // Only allow numbers and one decimal point
     if (text && !/^\d*\.?\d*$/.test(text)) {
       return;
