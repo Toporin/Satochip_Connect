@@ -20,6 +20,8 @@ interface Props extends Omit<TextInputProps, 'secureTextEntry' | 'style'> {
   inputStyle?: StyleProp<TextStyle>;
   /** Colour of the show / hide icon */
   iconColor?: string;
+  /** What the field holds, for the button label ("Show password", "Show PIN") */
+  secretName?: string;
 }
 
 /**
@@ -28,7 +30,13 @@ interface Props extends Omit<TextInputProps, 'secureTextEntry' | 'style'> {
  * eye while hidden ("show"), a slashed eye while visible ("hide").
  * Only a tap on the icon switches the mode.
  */
-export function PasswordInput({containerStyle, inputStyle, iconColor = '#888', ...inputProps}: Props) {
+export function PasswordInput({
+  containerStyle,
+  inputStyle,
+  iconColor = '#888',
+  secretName = 'password',
+  ...inputProps
+}: Props) {
   const [hidden, setHidden] = useState(true);
 
   return (
@@ -45,7 +53,7 @@ export function PasswordInput({containerStyle, inputStyle, iconColor = '#888', .
         hitSlop={12}
         style={styles.toggle}
         accessibilityRole="button"
-        accessibilityLabel={hidden ? 'Show password' : 'Hide password'}>
+        accessibilityLabel={`${hidden ? 'Show' : 'Hide'} ${secretName}`}>
         {hidden ? <SvgEye color={iconColor} /> : <SvgEyeOff color={iconColor} />}
       </Pressable>
     </View>

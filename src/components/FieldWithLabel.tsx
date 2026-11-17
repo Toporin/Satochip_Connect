@@ -1,5 +1,6 @@
 import { useTheme } from '@/hooks/useTheme.ts';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { PasswordInput } from '@/components/PasswordInput';
 import React from 'react';
 
 interface FieldWithLabelProps {
@@ -26,24 +27,23 @@ export function FieldWithLabel({
       <Text style={[styles.inputLabel, { color: Theme['fg-100'] }]}>
         {label}
       </Text>
-      <TextInput
-        style={[
-          styles.input,
+      <PasswordInput
+        containerStyle={[
+          styles.inputContainerFrame,
           {
             backgroundColor: Theme['bg-100'],
-            color: Theme['fg-100'],
             borderColor: isActive ? Theme['accent-100'] : Theme['bg-250'],
           },
         ]}
+        inputStyle={[styles.input, { color: Theme['fg-100'] }]}
+        iconColor={Theme['fg-150']}
+        secretName="PIN"
         value={value}
         onFocus={onPress}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={Theme['fg-300']}
-        secureTextEntry
         maxLength={16}
-        autoCapitalize="none"
-        autoCorrect={false}
       />
     </View>
   );
@@ -59,11 +59,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     letterSpacing: 0.3,
   },
-  input: {
+  inputContainerFrame: {
     borderWidth: 1.5,
     borderRadius: 12,
-    paddingVertical: 14,
     paddingHorizontal: 16,
+  },
+  input: {
+    paddingVertical: 14,
     fontSize: 16,
     fontWeight: '500',
   },

@@ -4,12 +4,12 @@ import {
   Modal,
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { PasswordInput } from '@/components/PasswordInput';
 
 interface PinModalProps {
   visible: boolean;
@@ -67,8 +67,11 @@ export const PinModal: React.FC<PinModalProps> = ({
         <View style={styles.modalContent}>
           <Text style={styles.title}>{title}</Text>
 
-          <TextInput
-            style={styles.pinInput}
+          <PasswordInput
+            containerStyle={styles.pinInputFrame}
+            inputStyle={styles.pinInput}
+            iconColor="#666"
+            secretName={type}
             value={pin}
             onChangeText={(text) => {
               setPin(text);
@@ -85,10 +88,7 @@ export const PinModal: React.FC<PinModalProps> = ({
             }}
             placeholder={`Enter ${type} (${minLength}-${maxLength} digits)`}
             // keyboardType={type==='PIN'? "numeric": "default"}
-            secureTextEntry={true}
             maxLength={maxLength}
-            autoCapitalize="none"
-            autoCorrect={false}
             autoComplete="off"
             spellCheck={false}
             autoFocus={true}
@@ -138,14 +138,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  pinInput: {
+  pinInputFrame: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    padding: 12,
+    paddingHorizontal: 12,
+  },
+  pinInput: {
+    paddingVertical: 12,
     fontSize: 16,
-    textAlign: 'center',
-    letterSpacing: 4,
+    letterSpacing: 1,
   },
   errorText: {
     color: 'red',
