@@ -4,7 +4,6 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  TextInput,
 } from 'react-native';
 
 import { useTheme } from '@/hooks/useTheme';
@@ -21,6 +20,7 @@ import useSatochipModal from '@/hooks/useSatochipModal.ts';
 import setupStyles from '@/screens/Accounts/setupStyles.ts';
 import { hp } from '@/constants/responsive.tsx';
 import Toast from 'react-native-toast-message';
+import { PasswordInput } from '@/components/PasswordInput';
 
 type Props = AccountsStackScreenProps<'AddSatochipAccount'>;
 
@@ -109,23 +109,15 @@ export default function AddSatochipAccountScreen({ navigation }: Props) {
         <Text style={[setupStyles.formLabel, { color: Theme['fg-100'] }]}>
           Card PIN
         </Text>
-        <TextInput
-          style={[
-            setupStyles.textInput,
-            {
-              backgroundColor: Theme['bg-175'],
-              color: Theme['fg-100'],
-              borderColor: Theme['bg-250']
-            }
-          ]}
+        <PasswordInput
+          containerStyle={{ backgroundColor: Theme['bg-175'], borderColor: Theme['bg-250'] }}
+          inputStyle={{ color: Theme['fg-100'] }}
+          iconColor={Theme['fg-150']}
+          secretName="PIN"
           placeholder="Enter your card PIN"
           placeholderTextColor={Theme['fg-300']}
           value={pin}
           onChangeText={setPin}
-          secureTextEntry
-          //keyboardType="numeric"
-          autoCapitalize="none"
-          autoCorrect={false}
           autoComplete="off"
           spellCheck={false}
           maxLength={16}
